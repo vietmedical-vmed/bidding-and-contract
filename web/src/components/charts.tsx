@@ -96,6 +96,21 @@ export function Panel({
   );
 }
 
+/**
+ * Ranking: tỷ lệ trúng ↓, then giá trị dự thầu ↓, then giá trị trúng ↓.
+ * Rows without a rate (no package decided yet) and the "(Chưa phân loại)"-style bucket go last.
+ */
+function rankRows(rows: KpiRow[]): KpiRow[] {
+  const rate = (r: KpiRow) => winRate(r) ?? -1;
+  return [...rows].sort(
+    (a, b) =>
+      Number(a.grp === null) - Number(b.grp === null) ||
+      rate(b) - rate(a) ||
+      b.gia_tri_du_thau - a.gia_tri_du_thau ||
+      b.gia_tri_du_thau_trung - a.gia_tri_du_thau_trung,
+  );
+}
+
 /** Breakdown table: one row per segment, with the outcome split drawn as a small stacked bar. */
 export function BreakdownTable({
   rows,
@@ -109,6 +124,7 @@ export function BreakdownTable({
   emptyLabel?: string;
 }) {
   const max = Math.max(1, ...rows.map((r) => r.goi));
+  const ranked = rankRows(rows);
   return (
     <div className="scroll-shadow overflow-x-auto">
       <table className="w-full min-w-[720px] border-collapse text-[13px]">
@@ -125,7 +141,7 @@ export function BreakdownTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => {
+          {ranked.map((r, i) => {
             const p = parts(r);
             const label = r.grp ?? emptyLabel;
             return (
