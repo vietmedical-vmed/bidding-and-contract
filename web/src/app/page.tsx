@@ -74,7 +74,7 @@ function Dashboard() {
           <BreakdownTable dimension="BU" rows={rows(d.bu)} totalGoi={total?.goi} hrefFor={(g) => detail({ bu: g })} />
         </Panel>
         <Panel title="Theo miền" right={<Legend />}>
-          <BreakdownTable dimension="Miền" rows={rows(d.mien)} totalGoi={total?.goi} hrefFor={(g) => detail({ mien: [g] })} emptyLabel="(Chưa ghi miền)" />
+          <BreakdownTable dimension="Miền" rows={rows(d.mien)} hrefFor={(g) => detail({ mien: [g] })} emptyLabel="(Chưa ghi miền)" />
         </Panel>
         <Panel title="Theo nhóm sản phẩm" right={<Legend />}>
           <BreakdownTable dimension="Nhóm SP" rows={rows(d.nhom)} totalGoi={total?.goi} hrefFor={(g) => detail({ nhom: [g] })} />
