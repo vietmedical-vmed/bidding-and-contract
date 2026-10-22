@@ -117,14 +117,19 @@ export function BreakdownTable({
   dimension,
   hrefFor,
   emptyLabel = "(Chưa phân loại)",
+  totalGoi,
 }: {
   rows: KpiRow[];
   dimension: string;
   hrefFor?: (grp: string) => string;
   emptyLabel?: string;
+  /** Distinct packages overall, to explain when the rows add up to more. */
+  totalGoi?: number;
 }) {
   const max = Math.max(1, ...rows.map((r) => r.goi));
   const ranked = rankRows(rows);
+  const sumGoi = rows.reduce((s, r) => s + r.goi, 0);
+  const noun = ({ Miền: "miền", "Nhóm SP": "nhóm sản phẩm", Sale: "sale" } as Record<string, string>)[dimension] ?? dimension;
   return (
     <div className="scroll-shadow overflow-x-auto">
       <table className="w-full min-w-[720px] border-collapse text-[13px]">
@@ -189,6 +194,19 @@ export function BreakdownTable({
           )}
         </tbody>
       </table>
+      {totalGoi !== undefined && rows.length > 0 && (
+        <p className="border-t border-slate-100 px-4 py-2 text-[11px] italic text-slate-400">
+          * Một gói thầu có mặt hàng thuộc nhiều {noun} được tính ở mỗi {noun} đó, nên tổng số gói các dòng
+          có thể lớn hơn tổng số gói thầu.
+          {sumGoi > totalGoi && (
+            <>
+              {" "}
+              Hiện tại: tổng các dòng <b className="font-semibold not-italic text-slate-500">{fmtInt(sumGoi)}</b>, tổng số gói
+              thầu <b className="font-semibold not-italic text-slate-500">{fmtInt(totalGoi)}</b>.
+            </>
+          )}
+        </p>
+      )}
     </div>
   );
 }

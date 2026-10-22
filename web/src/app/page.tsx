@@ -71,13 +71,13 @@ function Dashboard() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel title="Theo BU" right={<Legend />}>
-          <BreakdownTable dimension="BU" rows={rows(d.bu)} hrefFor={(g) => detail({ bu: g })} />
+          <BreakdownTable dimension="BU" rows={rows(d.bu)} totalGoi={total?.goi} hrefFor={(g) => detail({ bu: g })} />
         </Panel>
         <Panel title="Theo miền" right={<Legend />}>
-          <BreakdownTable dimension="Miền" rows={rows(d.mien)} hrefFor={(g) => detail({ mien: [g] })} emptyLabel="(Chưa ghi miền)" />
+          <BreakdownTable dimension="Miền" rows={rows(d.mien)} totalGoi={total?.goi} hrefFor={(g) => detail({ mien: [g] })} emptyLabel="(Chưa ghi miền)" />
         </Panel>
         <Panel title="Theo nhóm sản phẩm" right={<Legend />}>
-          <BreakdownTable dimension="Nhóm SP" rows={rows(d.nhom)} hrefFor={(g) => detail({ nhom: [g] })} />
+          <BreakdownTable dimension="Nhóm SP" rows={rows(d.nhom)} totalGoi={total?.goi} hrefFor={(g) => detail({ nhom: [g] })} />
         </Panel>
         <Panel title="Lý do trượt" subtitle="Số gói thầu có mặt hàng trượt, theo lý do">
           <ReasonBars rows={reasons} />
@@ -95,7 +95,7 @@ function Dashboard() {
       )}
 
       <Panel title="Theo sale" subtitle="Bấm tên để xem các mặt hàng của sale đó" right={<Legend />}>
-        <BreakdownTable dimension="Sale" rows={rows(d.sale)} hrefFor={(g) => detail({ sale: g })} emptyLabel="(Chưa ghi sale)" />
+        <BreakdownTable dimension="Sale" rows={rows(d.sale)} totalGoi={total?.goi} hrefFor={(g) => detail({ sale: g })} emptyLabel="(Chưa ghi sale)" />
       </Panel>
     </div>
   );
