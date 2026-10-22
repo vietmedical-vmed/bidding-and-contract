@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useAuth } from "@/components/AuthGate";
 import { FilterSelect } from "@/components/FilterSelect";
 import { AlertCircle, Loader2, LogOut, RefreshCw } from "@/components/icons";
+import { MissingInfoButton } from "@/components/MissingInfo";
 import { parseFilters, toQuery, type FilterOptions } from "@/lib/bids";
 import { ReloadContext, useApi } from "@/lib/useApi";
 
@@ -127,6 +128,8 @@ function Shell({ onReload, children }: { onReload: () => void; children: React.R
                   Bỏ lọc
                 </button>
               )}
+              <div className="flex-1" />
+              <MissingInfoButton filters={f} />
             </>
           ) : (
             <span className="text-[12px] text-slate-400">{options.error ?? "Đang tải bộ lọc…"}</span>

@@ -277,6 +277,53 @@ async function handleAction(action: string, p: any, session: Session, scope: Sco
       return { ok: true, rows: data ?? [], total: count ?? 0, page, pageSize: PAGE_SIZE };
     }
 
+    case "missing-info": {
+      // Packages whose items lack fields the dashboard groups by, with the Excel rows to fix.
+      scope = effectiveScope(scope, p);
+      const f = await withDefaultYear(admin, readFilters(p), p, scope);
+      let query = admin
+        .from("bid_items")
+        .select("nam,so_tbmt,ben_moi_thau,ten_goi_thau,sheet_name,source_row,phan_loai,nhom_san_pham,mien,sale")
+        .or("nhom_san_pham.is.null,mien.is.null,sale.is.null");
+      if (f.nam) query = query.eq("nam", f.nam);
+      if (f.bu) query = query.eq("bu", f.bu);
+      if (f.sale) query = query.eq("sale", f.sale);
+      if (scope.mienIn) query = query.in("mien", scope.mienIn);
+      if (scope.nhomIn) query = query.in("nhom_san_pham", scope.nhomIn);
+      const { data, error } = await query
+        .order("nam", { ascending: false })
+        .order("so_tbmt")
+        .order("source_row")
+        .range(0, 1999);
+      if (error) throw new Error(error.message);
+
+      type Gap = { field: string; rows: number[]; note?: string };
+      const packages = new Map<string, {
+        nam: number; so_tbmt: string | null; ben_moi_thau: string | null; ten_goi_thau: string | null;
+        sheet: string; gaps: Map<string, Gap>;
+      }>();
+      for (const r of data ?? []) {
+        const key = `${r.nam}|${r.so_tbmt ?? `row-${r.source_row}`}`;
+        let pkg = packages.get(key);
+        if (!pkg) {
+          pkg = { nam: r.nam, so_tbmt: r.so_tbmt, ben_moi_thau: r.ben_moi_thau, ten_goi_thau: r.ten_goi_thau, sheet: r.sheet_name, gaps: new Map() };
+          packages.set(key, pkg);
+        }
+        const add = (field: string, note?: string) => {
+          const gap = pkg!.gaps.get(field + (note ?? "")) ?? { field, rows: [], note };
+          gap.rows.push(r.source_row);
+          pkg!.gaps.set(field + (note ?? ""), gap);
+        };
+        if (!r.nhom_san_pham) {
+          add("Phân loại", r.phan_loai ? `"${r.phan_loai}" chưa có trong bảng mapping nhóm sản phẩm` : undefined);
+        }
+        if (!r.mien) add("Miền");
+        if (!r.sale) add("Sale");
+      }
+      const list = [...packages.values()].map((pkg) => ({ ...pkg, gaps: [...pkg.gaps.values()] }));
+      return { ok: true, nam: f.nam ?? null, packages: list, items: (data ?? []).length };
+    }
+
     default:
       return { ok: false, error: `unknown action: ${action}` };
   }

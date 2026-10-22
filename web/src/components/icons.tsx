@@ -38,3 +38,9 @@ export const RefreshCw = icon([
   "M3 21v-5h5",
 ]);
 export const LogOut = icon(["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4", "m16 17 5-5-5-5", "M21 12H9"]);
+export const XIcon = icon(["M18 6 6 18", "m6 6 12 12"]);
+export const AlertTriangle = icon([
+  "m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3",
+  "M12 9v4",
+  "M12 17h.01",
+]);
