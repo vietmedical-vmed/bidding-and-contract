@@ -167,6 +167,21 @@ function effectiveScope(scope: Scope, p: any): Scope {
   return { mienIn: narrow(scope.mienIn, p?.mien), nhomIn: narrow(scope.nhomIn, p?.nhom) };
 }
 
+// Fiscal year runs T4 → T3, so "từ T11 đến T2" means 11, 12, 1, 2.
+const FISCAL_MONTHS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+
+/** Months between `tu` and `den` (inclusive, fiscal order); null when no month filter is set. */
+function monthRange(tu: unknown, den: unknown): number[] | null {
+  const valid = (v: unknown) => (Number.isInteger(Number(v)) && Number(v) >= 1 && Number(v) <= 12 ? Number(v) : null);
+  const from = valid(tu);
+  const to = valid(den);
+  if (from === null && to === null) return null;
+  let i = FISCAL_MONTHS.indexOf(from ?? 4);
+  let j = FISCAL_MONTHS.indexOf(to ?? 3);
+  if (i > j) [i, j] = [j, i];
+  return FISCAL_MONTHS.slice(i, j + 1);
+}
+
 function sanitizeSearch(s: string): string {
   return String(s ?? "").replace(/[,()*\\%]/g, " ").trim();
 }
@@ -251,6 +266,7 @@ async function handleAction(action: string, p: any, session: Session, scope: Sco
       const page = Math.max(1, Number(p?.page) || 1);
       const kq = KET_QUA.has(p?.kq) ? p.kq : undefined;
       const q = sanitizeSearch(p?.q);
+      const months = monthRange(p?.tu, p?.den);
 
       let query = admin.from("bid_items").select(ITEM_COLUMNS, { count: "exact" });
       if (f.nam) query = query.eq("nam", f.nam);
@@ -259,6 +275,7 @@ async function handleAction(action: string, p: any, session: Session, scope: Sco
       if (scope.mienIn) query = query.in("mien", scope.mienIn);
       if (scope.nhomIn) query = query.in("nhom_san_pham", scope.nhomIn);
       if (kq) query = query.eq("ket_qua", kq);
+      if (months) query = query.in("thang_du_thau_so", months);
       if (q) {
         const like = `*${q}*`;
         query = query.or(

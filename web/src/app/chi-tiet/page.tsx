@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingBlock, RefreshingBar } from "@/components/AppShell";
+import { FilterSelect } from "@/components/FilterSelect";
 import { ChevronLeft, ChevronRight } from "@/components/icons";
 import { SearchBox } from "@/components/SearchBox";
 import { fmtInt, parseFilters } from "@/lib/bids";
@@ -46,6 +47,21 @@ type Item = {
 
 type ItemsResp = { rows: Item[]; total: number; page: number; pageSize: number };
 
+// Fiscal year order (T4 → T3 of the next year), as in the month chart.
+const MONTH_OPTIONS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3].map((m) => `T${m}`);
+
+function monthParam(v: string | null): number | undefined {
+  const m = Number(v);
+  return Number.isInteger(m) && m >= 1 && m <= 12 ? m : undefined;
+}
+
+/** "T1" of fiscal year 2025 is January 2026: show the calendar month and year. */
+function bidMonth(r: Item): string {
+  const m = Number(r.thang_du_thau?.replace(/\D/g, ""));
+  if (!m) return r.thang_du_thau ?? "";
+  return `T${m}/${m < 4 ? r.nam + 1 : r.nam}`;
+}
+
 const nf = new Intl.NumberFormat("vi-VN");
 const num = (v: number | null) => (v === null ? "" : nf.format(v));
 const date = (v: string | null) => (v ? v.split("-").reverse().join("/") : "");
@@ -66,7 +82,11 @@ function Detail() {
   const kq = params.get("kq") ?? undefined;
   const q = params.get("q") ?? undefined;
   const page = Math.max(1, Number(params.get("page")) || 1);
-  const items = useApi<ItemsResp>("items", { ...f, kq, q, page });
+  const tu = monthParam(params.get("tu"));
+  const den = monthParam(params.get("den"));
+  const items = useApi<ItemsResp>("items", { ...f, kq, q, page, tu, den });
+  const router = useRouter();
+  const pathname = usePathname();
 
   /** Current URL with some params changed (undefined removes the param). */
   const withParams = (changes: Record<string, string | undefined>) => {
@@ -86,6 +106,18 @@ function Detail() {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <SearchBox />
+        <FilterSelect
+          label="Từ tháng"
+          options={MONTH_OPTIONS}
+          selected={tu ? [`T${tu}`] : []}
+          onChange={(v) => router.push(`${pathname}${withParams({ tu: v[0]?.slice(1), page: undefined })}`)}
+        />
+        <FilterSelect
+          label="Đến tháng"
+          options={MONTH_OPTIONS}
+          selected={den ? [`T${den}`] : []}
+          onChange={(v) => router.push(`${pathname}${withParams({ den: v[0]?.slice(1), page: undefined })}`)}
+        />
         <div className="flex items-center gap-1 rounded-md border border-slate-200 bg-white p-0.5">
           {[undefined, ...Object.keys(KET_QUA)].map((k) => (
             <Link
@@ -109,7 +141,7 @@ function Detail() {
             <table className="w-full min-w-[1200px] border-collapse text-[13px]">
               <thead>
                 <tr className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
-                  <th className="px-3 py-2 text-left font-semibold">Năm / tháng</th>
+                  <th className="px-3 py-2 text-left font-semibold">Tháng dự thầu</th>
                   <th className="px-3 py-2 text-left font-semibold">Số TBMT</th>
                   <th className="px-3 py-2 text-left font-semibold">Bên mời thầu / gói thầu</th>
                   <th className="px-3 py-2 text-left font-semibold">Mặt hàng</th>
@@ -125,7 +157,7 @@ function Detail() {
                 {rows.map((r, i) => (
                   <tr key={r.id} className={`align-top ${i % 2 ? "bg-slate-50/50" : "bg-white"} hover:bg-blue-50/40`}>
                     <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600">
-                      {r.nam} · {r.thang_du_thau}
+                      {bidMonth(r)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 tabular-nums">{r.so_tbmt}</td>
                     <td className="max-w-72 px-3 py-2">
