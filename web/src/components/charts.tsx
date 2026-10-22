@@ -193,10 +193,11 @@ export function BreakdownTable({
   );
 }
 
-/** Stacked columns by month (1–12), Trúng at the baseline. */
+/** Stacked columns by month (T4 → T3), Trúng at the baseline. */
 export function MonthColumns({ rows }: { rows: KpiRow[] }) {
   const byMonth = new Map(rows.map((r) => [Number(r.grp), r]));
-  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  // Each sheet is a fiscal year: T4 of year N through T3 of year N+1.
+  const months = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
   const ticks = niceTicks(Math.max(1, ...rows.map((r) => r.goi)));
   const top = ticks[ticks.length - 1];
   const stackOrder = [...SERIES].reverse();

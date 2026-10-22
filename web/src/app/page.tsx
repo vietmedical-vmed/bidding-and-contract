@@ -86,7 +86,7 @@ function Dashboard() {
 
       {d.monthYear && (
         <Panel
-          title={`Theo tháng dự thầu – năm ${d.monthYear}`}
+          title={`Theo tháng dự thầu – năm ${d.monthYear} (T4/${d.monthYear} → T3/${d.monthYear + 1})`}
           subtitle={f.nam === "all" ? "Đang xem tất cả năm; biểu đồ tháng hiển thị năm mới nhất" : undefined}
           right={<Legend />}
         >
