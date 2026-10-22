@@ -19,12 +19,13 @@ export type FilterOptions = {
   sale: string[];
 };
 
+/** Năm, BU, sale: one value. Nhóm SP, miền: several (repeated URL params). */
 export type Filters = {
   nam?: number;
   bu?: string;
-  nhom?: string;
-  mien?: string;
   sale?: string;
+  nhom: string[];
+  mien: string[];
 };
 
 export const FILTER_KEYS = ["nam", "bu", "nhom", "mien", "sale"] as const;
@@ -35,17 +36,21 @@ export function parseFilters(sp: URLSearchParams): Filters {
   return {
     nam: Number.isInteger(nam) && nam > 0 ? nam : undefined,
     bu: str("bu"),
-    nhom: str("nhom"),
-    mien: str("mien"),
     sale: str("sale"),
+    nhom: sp.getAll("nhom").filter(Boolean),
+    mien: sp.getAll("mien").filter(Boolean),
   };
 }
 
-/** Query string for the given filters (plus overrides); undefined values are dropped. */
-export function toQuery(f: Filters, extra: Record<string, string | number | undefined> = {}): string {
+type QueryValue = string | number | string[] | undefined;
+
+/** Query string for the given filters (plus overrides); empty values are dropped. */
+export function toQuery(f: Partial<Filters>, extra: Record<string, QueryValue> = {}): string {
   const q = new URLSearchParams();
-  for (const [k, v] of Object.entries({ ...f, ...extra })) {
-    if (v !== undefined && v !== "") q.set(k, String(v));
+  for (const [k, v] of Object.entries({ ...f, ...extra } as Record<string, QueryValue>)) {
+    for (const item of Array.isArray(v) ? v : [v]) {
+      if (item !== undefined && item !== "") q.append(k, String(item));
+    }
   }
   return q.toString();
 }

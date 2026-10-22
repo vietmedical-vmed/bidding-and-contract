@@ -119,7 +119,7 @@ async function getScope(session: Session, admin: SupabaseClient): Promise<Scope>
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────
-type Filters = { nam?: number; bu?: string; nhom?: string; mien?: string; sale?: string };
+type Filters = { nam?: number; bu?: string; sale?: string };
 
 function readFilters(p: any): Filters {
   const nam = Number(p?.nam);
@@ -127,10 +127,21 @@ function readFilters(p: any): Filters {
   return {
     nam: Number.isInteger(nam) && nam > 0 ? nam : undefined,
     bu: str(p?.bu),
-    nhom: str(p?.nhom),
-    mien: str(p?.mien),
     sale: str(p?.sale),
   };
+}
+
+// Nhóm SP / miền are multi-select: intersect the user's choice with what their role may see.
+// An empty intersection must match nothing, so it becomes a value no row has.
+function narrow(allowed: string[] | null, chosen: unknown): string[] | null {
+  const picked = Array.isArray(chosen) ? chosen.filter((v): v is string => typeof v === "string" && v !== "") : [];
+  if (!picked.length) return allowed;
+  const out = allowed ? picked.filter((v) => allowed.includes(v)) : picked;
+  return out.length ? out : ["\u0000"];
+}
+
+function effectiveScope(scope: Scope, p: any): Scope {
+  return { mienIn: narrow(scope.mienIn, p?.mien), nhomIn: narrow(scope.nhomIn, p?.nhom) };
 }
 
 function sanitizeSearch(s: string): string {
@@ -142,8 +153,8 @@ async function kpi(admin: SupabaseClient, group: string | null, f: Filters, scop
     p_group: group,
     p_nam: f.nam ?? null,
     p_bu: f.bu ?? null,
-    p_nhom: f.nhom ?? null,
-    p_mien: f.mien ?? null,
+    p_nhom: null,
+    p_mien: null,
     p_sale: f.sale ?? null,
     p_mien_in: scope.mienIn,
     p_nhom_in: scope.nhomIn,
@@ -182,6 +193,7 @@ async function handleAction(action: string, p: any, session: Session, scope: Sco
 
     case "dashboard": {
       const f = readFilters(p);
+      scope = effectiveScope(scope, p);
       // The month chart needs a single year: the filtered one, else the latest year with data.
       const monthYearP = f.nam
         ? Promise.resolve(f.nam)
@@ -200,6 +212,7 @@ async function handleAction(action: string, p: any, session: Session, scope: Sco
 
     case "items": {
       const f = readFilters(p);
+      scope = effectiveScope(scope, p);
       const page = Math.max(1, Number(p?.page) || 1);
       const kq = KET_QUA.has(p?.kq) ? p.kq : undefined;
       const q = sanitizeSearch(p?.q);
@@ -207,8 +220,6 @@ async function handleAction(action: string, p: any, session: Session, scope: Sco
       let query = admin.from("bid_items").select(ITEM_COLUMNS, { count: "exact" });
       if (f.nam) query = query.eq("nam", f.nam);
       if (f.bu) query = query.eq("bu", f.bu);
-      if (f.nhom) query = query.eq("nhom_san_pham", f.nhom);
-      if (f.mien) query = query.eq("mien", f.mien);
       if (f.sale) query = query.eq("sale", f.sale);
       if (scope.mienIn) query = query.in("mien", scope.mienIn);
       if (scope.nhomIn) query = query.in("nhom_san_pham", scope.nhomIn);
@@ -267,9 +278,11 @@ Deno.serve(async (req) => {
   if (!dbUser || dbUser.active === false) return json({ ok: false, error: "unauthorized" }, 401);
 
   try {
+    const started = Date.now();
     const scope = await getScope(session, admin);
     const result = await handleAction(action, payload || {}, session, scope, admin);
-    return json(result, result.ok === false ? 400 : 200);
+    // took_ms lets the browser console show where time goes when a page feels slow.
+    return json({ ...result, took_ms: Date.now() - started }, result.ok === false ? 400 : 200);
   } catch (err) {
     return json({ ok: false, error: (err as Error).message }, 500);
   }

@@ -1,5 +1,5 @@
 // Client for the bidding-login / bidding-api Edge Functions (org-wide login pattern,
-// same as contract-management and ccdc-management).
+// same as contract-management, ccdc-management and sale-target).
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
@@ -7,6 +7,7 @@ const FN_LOGIN = "bidding-login";
 const FN_API = "bidding-api";
 const TOKEN_KEY = "bidding.token.v1";
 const USER_KEY = "bidding.user.v1";
+const TIMEOUT_MS = 45_000;
 
 export type User = {
   username: string;
@@ -31,16 +32,6 @@ function write(key: string, value: string, remember: boolean) {
   (remember ? localStorage : sessionStorage).setItem(key, value);
 }
 
-export function getUser(): User | null {
-  if (!read(TOKEN_KEY)) return null;
-  try {
-    const raw = read(USER_KEY);
-    return raw ? (JSON.parse(raw) as User) : null;
-  } catch {
-    return null;
-  }
-}
-
 const AUTH_EVENT = "bidding:auth";
 
 /** For useSyncExternalStore: notifies on login/logout in this tab and in other tabs. */
@@ -57,6 +48,16 @@ export function getToken(): string | null {
   return read(TOKEN_KEY);
 }
 
+export function getUser(): User | null {
+  if (!read(TOKEN_KEY)) return null;
+  try {
+    const raw = read(USER_KEY);
+    return raw ? (JSON.parse(raw) as User) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function clearSession() {
   for (const store of [sessionStorage, localStorage]) {
     store.removeItem(TOKEN_KEY);
@@ -65,7 +66,8 @@ export function clearSession() {
   window.dispatchEvent(new Event(AUTH_EVENT));
 }
 
-async function call<T>(fn: string, body: unknown): Promise<T> {
+async function call<T>(fn: string, body: unknown, label: string): Promise<T> {
+  const started = performance.now();
   let res: Response;
   try {
     res = await fetch(`${SUPABASE_URL}/functions/v1/${fn}`, {
@@ -76,11 +78,15 @@ async function call<T>(fn: string, body: unknown): Promise<T> {
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-  } catch {
-    throw new ApiError("network");
+  } catch (err) {
+    console.warn(`[bidding] ${label} failed after ${Math.round(performance.now() - started)}ms`, err);
+    throw new ApiError(err instanceof DOMException && err.name === "TimeoutError" ? "timeout" : "network");
   }
   const data = await res.json().catch(() => ({}));
+  // Server time vs. round trip: tells a slow query apart from a slow network / cold start.
+  console.info(`[bidding] ${label}: HTTP ${res.status}, ${Math.round(performance.now() - started)}ms (server ${data.took_ms ?? "?"}ms)`);
   if (!res.ok || data.ok === false) {
     if (data.error === "unauthorized") clearSession();
     throw new ApiError(data.error || `HTTP ${res.status}`);
@@ -89,7 +95,7 @@ async function call<T>(fn: string, body: unknown): Promise<T> {
 }
 
 export async function login(username: string, password: string, remember: boolean): Promise<User> {
-  const res = await call<User & { token: string }>(FN_LOGIN, { username, password });
+  const res = await call<User & { token: string }>(FN_LOGIN, { username, password }, "login");
   write(TOKEN_KEY, res.token, remember);
   const user: User = {
     username: res.username,
@@ -104,14 +110,22 @@ export async function login(username: string, password: string, remember: boolea
   return user;
 }
 
+/** Same as the other apps: bidding-login checks the old password, then stores the new one. */
+export async function changePassword(username: string, password: string, newPassword: string): Promise<void> {
+  await call(FN_LOGIN, { username, password, newPassword }, "change-password");
+}
+
 export function api<T>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
-  return call<T>(FN_API, { action, token: read(TOKEN_KEY), payload });
+  return call<T>(FN_API, { action, token: read(TOKEN_KEY), payload }, action);
 }
 
 export function errorMessage(err: unknown): string {
   const m = String(err instanceof Error ? err.message : err).toLowerCase();
-  if (m.includes("invalid") || m.includes("not found")) return "Sai tên đăng nhập hoặc mật khẩu";
+  if (m.includes("invalid") || m.includes("not found")) return "Sai tài khoản hoặc mật khẩu";
+  if (m.includes("weak_password")) return "Mật khẩu mới tối thiểu 6 ký tự";
+  if (m.includes("same_password")) return "Mật khẩu mới phải khác mật khẩu cũ";
   if (m.includes("unauthorized")) return "Phiên hết hạn, vui lòng đăng nhập lại";
+  if (m.includes("timeout")) return "Máy chủ phản hồi quá lâu, vui lòng bấm Reload";
   if (m.includes("network") || m.includes("fetch")) return "Lỗi kết nối, vui lòng thử lại";
   return err instanceof Error ? err.message : "Lỗi không xác định";
 }

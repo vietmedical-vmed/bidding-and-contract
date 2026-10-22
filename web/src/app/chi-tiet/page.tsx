@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { FilterBar } from "@/components/FilterBar";
-import { Header } from "@/components/Header";
+import { AppShell, LoadingBlock, RefreshingBar } from "@/components/AppShell";
+import { ChevronLeft, ChevronRight } from "@/components/icons";
 import { SearchBox } from "@/components/SearchBox";
-import { fmtInt, parseFilters, toQuery, type FilterOptions } from "@/lib/bids";
+import { fmtInt, parseFilters } from "@/lib/bids";
 import { useApi } from "@/lib/useApi";
 
 const KET_QUA: Record<string, string> = {
@@ -16,10 +16,11 @@ const KET_QUA: Record<string, string> = {
   huy: "Hủy",
 };
 
-const KQ_DOT: Record<string, string> = {
-  trung: "bg-series-1",
-  truot: "bg-series-2",
-  cho_kq: "bg-series-3",
+const KQ_BADGE: Record<string, string> = {
+  trung: "bg-blue-50 text-blue-700 border-blue-200",
+  truot: "bg-red-50 text-red-700 border-red-200",
+  cho_kq: "bg-slate-50 text-slate-500 border-slate-200",
+  huy: "bg-slate-100 text-slate-500 border-slate-200",
 };
 
 type Item = {
@@ -52,7 +53,9 @@ const date = (v: string | null) => (v ? v.split("-").reverse().join("/") : "");
 export default function DetailPage() {
   return (
     <Suspense>
-      <Detail />
+      <AppShell>
+        <Detail />
+      </AppShell>
     </Suspense>
   );
 }
@@ -63,8 +66,6 @@ function Detail() {
   const kq = params.get("kq") ?? undefined;
   const q = params.get("q") ?? undefined;
   const page = Math.max(1, Number(params.get("page")) || 1);
-
-  const options = useApi<{ options: FilterOptions }>("filter-options", {});
   const items = useApi<ItemsResp>("items", { ...f, kq, q, page });
 
   /** Current URL with some params changed (undefined removes the param). */
@@ -82,126 +83,124 @@ function Detail() {
   const pages = d ? Math.max(1, Math.ceil(d.total / d.pageSize)) : 1;
 
   return (
-    <>
-      <Header current="/chi-tiet/" query={toQuery(f)} />
-      <main className="mx-auto max-w-7xl space-y-4 px-4 py-6">
-        {options.data && (
-          <FilterBar options={options.data.options}>
-            <SearchBox />
-          </FilterBar>
-        )}
-
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-ink-2">Kết quả:</span>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchBox />
+        <div className="flex items-center gap-1 rounded-md border border-slate-200 bg-white p-0.5">
           {[undefined, ...Object.keys(KET_QUA)].map((k) => (
             <Link
               key={k ?? "all"}
               href={withParams({ kq: k, page: undefined })}
-              className={`rounded-full border px-3 py-1 ${kq === k ? "border-accent text-ink" : "border-line text-ink-2 hover:text-ink"}`}
+              className={`rounded px-2.5 py-1 text-[13px] ${kq === k ? "bg-blue-500 font-medium text-white" : "text-slate-600 hover:bg-slate-50"}`}
             >
               {k ? KET_QUA[k] : "Tất cả"}
             </Link>
           ))}
-          <span className="ml-auto text-ink-2">{d ? `${fmtInt(d.total)} mặt hàng` : ""}</span>
         </div>
+        <span className="ml-auto text-[13px] text-slate-500">{d ? `${fmtInt(d.total)} mặt hàng` : ""}</span>
+      </div>
 
-        {items.error && <p className="text-sm text-critical">Không tải được dữ liệu: {items.error}</p>}
-
-        <div className={`card overflow-x-auto p-0 transition-opacity ${items.loading ? "opacity-60" : ""}`}>
-          <table className="w-full min-w-[1200px] text-sm">
-            <thead className="border-b border-line text-left text-xs text-ink-3">
-              <tr>
-                <th className="px-3 py-2 font-normal">Năm / tháng</th>
-                <th className="px-3 py-2 font-normal">Số TBMT</th>
-                <th className="px-3 py-2 font-normal">Bên mời thầu / gói thầu</th>
-                <th className="px-3 py-2 font-normal">Mặt hàng</th>
-                <th className="px-3 py-2 font-normal">Nhóm SP</th>
-                <th className="px-3 py-2 font-normal">Miền / sale</th>
-                <th className="px-3 py-2 text-right font-normal">SL</th>
-                <th className="px-3 py-2 text-right font-normal">Đơn giá</th>
-                <th className="px-3 py-2 text-right font-normal">Thành tiền</th>
-                <th className="px-3 py-2 font-normal">Kết quả</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-b border-line align-top last:border-0 hover:bg-page">
-                  <td className="whitespace-nowrap px-3 py-2 tabular-nums">
-                    {r.nam} · {r.thang_du_thau}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2 tabular-nums">{r.so_tbmt}</td>
-                  <td className="max-w-72 px-3 py-2">
-                    <div className="line-clamp-1" title={r.ben_moi_thau ?? ""}>
-                      {r.ben_moi_thau}
-                    </div>
-                    <div className="line-clamp-1 text-xs text-ink-3" title={r.ten_goi_thau ?? ""}>
-                      {r.ten_goi_thau}
-                    </div>
-                  </td>
-                  <td className="max-w-72 px-3 py-2">
-                    <div className="line-clamp-2" title={r.danh_muc_hang ?? ""}>
-                      {r.danh_muc_hang}
-                    </div>
-                    {r.model && (
-                      <div className="line-clamp-1 text-xs text-ink-3" title={r.model}>
-                        {r.model}
+      {items.loading && d && <RefreshingBar />}
+      {!d || items.error ? (
+        <LoadingBlock error={items.error} />
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="scroll-shadow overflow-x-auto">
+            <table className="w-full min-w-[1200px] border-collapse text-[13px]">
+              <thead>
+                <tr className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+                  <th className="px-3 py-2 text-left font-semibold">Năm / tháng</th>
+                  <th className="px-3 py-2 text-left font-semibold">Số TBMT</th>
+                  <th className="px-3 py-2 text-left font-semibold">Bên mời thầu / gói thầu</th>
+                  <th className="px-3 py-2 text-left font-semibold">Mặt hàng</th>
+                  <th className="px-3 py-2 text-left font-semibold">Nhóm SP</th>
+                  <th className="px-3 py-2 text-left font-semibold">Miền / sale</th>
+                  <th className="px-3 py-2 text-right font-semibold">SL</th>
+                  <th className="px-3 py-2 text-right font-semibold">Đơn giá</th>
+                  <th className="px-3 py-2 text-right font-semibold">Thành tiền</th>
+                  <th className="px-3 py-2 text-left font-semibold">Kết quả</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={r.id} className={`align-top ${i % 2 ? "bg-slate-50/50" : "bg-white"} hover:bg-blue-50/40`}>
+                    <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600">
+                      {r.nam} · {r.thang_du_thau}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 tabular-nums">{r.so_tbmt}</td>
+                    <td className="max-w-72 px-3 py-2">
+                      <div className="line-clamp-1 text-slate-800" title={r.ben_moi_thau ?? ""}>
+                        {r.ben_moi_thau}
                       </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <div>{r.nhom_san_pham}</div>
-                    <div className="text-xs text-ink-3">{r.bu}</div>
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2">
-                    <div>{r.mien}</div>
-                    <div className="text-xs text-ink-3">{r.sale}</div>
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{num(r.so_luong)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{num(r.don_gia)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{num(r.thanh_tien)}</td>
-                  <td className="whitespace-nowrap px-3 py-2">
-                    <span className="flex items-center gap-1.5">
-                      {KQ_DOT[r.ket_qua] && <span className={`h-2 w-2 rounded-full ${KQ_DOT[r.ket_qua]}`} aria-hidden />}
-                      {r.ket_qua_thau ?? KET_QUA[r.ket_qua] ?? r.ket_qua}
-                    </span>
-                    {r.ngay_trung_thau && <div className="text-xs text-ink-3">{date(r.ngay_trung_thau)}</div>}
-                  </td>
-                </tr>
-              ))}
-              {d && rows.length === 0 && (
-                <tr>
-                  <td colSpan={10} className="px-3 py-8 text-center text-ink-3">
-                    Không có mặt hàng nào khớp bộ lọc.
-                  </td>
-                </tr>
-              )}
-              {!d && !items.error && (
-                <tr>
-                  <td colSpan={10} className="px-3 py-8 text-center text-ink-3">
-                    Đang tải dữ liệu…
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                      <div className="line-clamp-1 text-[11px] text-slate-400" title={r.ten_goi_thau ?? ""}>
+                        {r.ten_goi_thau}
+                      </div>
+                    </td>
+                    <td className="max-w-72 px-3 py-2">
+                      <div className="line-clamp-2 text-slate-800" title={r.danh_muc_hang ?? ""}>
+                        {r.danh_muc_hang}
+                      </div>
+                      {r.model && (
+                        <div className="line-clamp-1 text-[11px] text-slate-400" title={r.model}>
+                          {r.model}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="text-slate-800">{r.nhom_san_pham}</div>
+                      <div className="text-[11px] text-slate-400">{r.bu}</div>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2">
+                      <div className="text-slate-800">{r.mien}</div>
+                      <div className="text-[11px] text-slate-400">{r.sale}</div>
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">{num(r.so_luong)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{num(r.don_gia)}</td>
+                    <td className="px-3 py-2 text-right font-medium tabular-nums">{num(r.thanh_tien)}</td>
+                    <td className="whitespace-nowrap px-3 py-2">
+                      <span className={`inline-block rounded border px-1.5 py-0.5 text-[11px] font-medium ${KQ_BADGE[r.ket_qua] ?? KQ_BADGE.cho_kq}`}>
+                        {r.ket_qua_thau ?? KET_QUA[r.ket_qua] ?? r.ket_qua}
+                      </span>
+                      {r.ngay_trung_thau && <div className="mt-0.5 text-[11px] text-slate-400">{date(r.ngay_trung_thau)}</div>}
+                    </td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={10} className="px-3 py-10 text-center text-slate-400">
+                      Không có mặt hàng nào khớp bộ lọc
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <nav className="flex items-center justify-end gap-2 border-t border-slate-100 px-4 py-2 text-[13px]" aria-label="Phân trang">
+            <span className="mr-1 text-slate-500">
+              Trang {page} / {pages}
+            </span>
+            <PageLink href={page > 1 ? withParams({ page: String(page - 1) }) : null} label="Trang trước">
+              <ChevronLeft size={14} />
+            </PageLink>
+            <PageLink href={page < pages ? withParams({ page: String(page + 1) }) : null} label="Trang sau">
+              <ChevronRight size={14} />
+            </PageLink>
+          </nav>
         </div>
+      )}
+    </div>
+  );
+}
 
-        <nav className="flex items-center justify-end gap-3 text-sm" aria-label="Phân trang">
-          <span className="text-ink-2">
-            Trang {page} / {pages}
-          </span>
-          {page > 1 && (
-            <Link href={withParams({ page: String(page - 1) })} className="rounded-md border border-line px-3 py-1 hover:bg-page">
-              ← Trước
-            </Link>
-          )}
-          {page < pages && (
-            <Link href={withParams({ page: String(page + 1) })} className="rounded-md border border-line px-3 py-1 hover:bg-page">
-              Sau →
-            </Link>
-          )}
-        </nav>
-      </main>
-    </>
+function PageLink({ href, label, children }: { href: string | null; label: string; children: React.ReactNode }) {
+  const cls = "grid h-7 w-7 place-items-center rounded-md border border-slate-200";
+  return href ? (
+    <Link href={href} aria-label={label} className={`${cls} text-slate-600 hover:bg-slate-50`}>
+      {children}
+    </Link>
+  ) : (
+    <span aria-hidden className={`${cls} text-slate-300`}>
+      {children}
+    </span>
   );
 }
