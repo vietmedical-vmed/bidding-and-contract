@@ -47,6 +47,7 @@ function Shell({ onReload, children }: { onReload: () => void; children: React.R
     .join("")
     .slice(0, 2)
     .toUpperCase();
+  // "Bỏ lọc" returns to the defaults, including the latest year.
   const hasFilter = Boolean(f.nam || f.bu || f.sale || f.nhom.length || f.mien.length);
   const filterQuery = toQuery(f);
 
@@ -95,8 +96,9 @@ function Shell({ onReload, children }: { onReload: () => void; children: React.R
               <FilterSelect
                 label="Năm"
                 options={opts.nam.map(String)}
-                selected={f.nam ? [String(f.nam)] : []}
-                onChange={(v) => setFilter("nam", v)}
+                // No year in the URL means the latest year (the API applies the same default).
+                selected={f.nam === "all" ? [] : [String(f.nam ?? opts.nam[0] ?? "")].filter(Boolean)}
+                onChange={(v) => setFilter("nam", v.length ? v : ["all"])}
               />
               <FilterSelect label="BU" options={opts.bu} selected={f.bu ? [f.bu] : []} onChange={(v) => setFilter("bu", v)} />
               <FilterSelect

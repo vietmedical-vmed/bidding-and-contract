@@ -20,9 +20,12 @@ export type FilterOptions = {
   sale: string[];
 };
 
-/** Năm, BU, sale: one value. Nhóm SP, miền: several (repeated URL params). */
+/**
+ * Năm, BU, sale: one value. Nhóm SP, miền: several (repeated URL params).
+ * nam: missing = latest year (the API picks it), "all" = every year.
+ */
 export type Filters = {
-  nam?: number;
+  nam?: number | "all";
   bu?: string;
   sale?: string;
   nhom: string[];
@@ -32,10 +35,11 @@ export type Filters = {
 export const FILTER_KEYS = ["nam", "bu", "nhom", "mien", "sale"] as const;
 
 export function parseFilters(sp: URLSearchParams): Filters {
-  const nam = Number(sp.get("nam"));
+  const rawNam = sp.get("nam");
+  const nam = Number(rawNam);
   const str = (k: string) => sp.get(k) || undefined;
   return {
-    nam: Number.isInteger(nam) && nam > 0 ? nam : undefined,
+    nam: rawNam === "all" ? "all" : Number.isInteger(nam) && nam > 0 ? nam : undefined,
     bu: str("bu"),
     sale: str("sale"),
     nhom: sp.getAll("nhom").filter(Boolean),

@@ -9,6 +9,8 @@ import { useApi } from "@/lib/useApi";
 
 type Raw = Record<string, unknown>;
 type DashboardResp = {
+  nam: number | null; // year applied (latest year when none chosen)
+  updatedAt: string | null; // yyyy-mm-dd
   total: Raw | null;
   bu: Raw[];
   nhom: Raw[];
@@ -51,7 +53,7 @@ function Dashboard() {
 
       {total ? (
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,3fr)]">
-          <WinRateCard r={total} />
+          <WinRateCard r={total} updatedAt={d.updatedAt} />
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
             <StatCard label="Gói thầu dự thầu" value={fmtInt(total.goi)} sub={`${fmtInt(total.mat_hang)} mặt hàng`} />
             <StatCard label="Trúng" value={fmtInt(total.trung)} swatch="bg-won" />
@@ -85,7 +87,7 @@ function Dashboard() {
       {d.monthYear && (
         <Panel
           title={`Theo tháng dự thầu – năm ${d.monthYear}`}
-          subtitle={f.nam ? undefined : "Chọn Năm ở bộ lọc để xem năm khác"}
+          subtitle={f.nam === "all" ? "Đang xem tất cả năm; biểu đồ tháng hiển thị năm mới nhất" : undefined}
           right={<Legend />}
         >
           <MonthColumns rows={rows(d.thang)} />

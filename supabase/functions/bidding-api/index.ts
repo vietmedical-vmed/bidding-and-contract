@@ -131,6 +131,29 @@ function readFilters(p: any): Filters {
   };
 }
 
+// No year in the request = the latest year the user can see; nam="all" = every year.
+async function withDefaultYear(admin: SupabaseClient, f: Filters, p: any, scope: Scope): Promise<Filters> {
+  if (f.nam || p?.nam === "all") return f;
+  const { data, error } = await admin.rpc("bid_filter_options", { p_mien_in: scope.mienIn, p_nhom_in: scope.nhomIn });
+  if (error) throw new Error(error.message);
+  return { ...f, nam: (data?.nam ?? [])[0] };
+}
+
+// "Dữ liệu cập nhật đến ngày": the Excel file's last-modified date of the latest successful sync,
+// as yyyy-mm-dd in Vietnam time.
+async function dataUpdatedAt(admin: SupabaseClient): Promise<string | null> {
+  const { data, error } = await admin
+    .from("bid_sync_runs")
+    .select("source_modified_at, finished_at")
+    .eq("status", "success")
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const ts = data?.source_modified_at ?? data?.finished_at;
+  return ts ? new Date(ts).toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }) : null;
+}
+
 // Nhóm SP / miền are multi-select: intersect the user's choice with what their role may see.
 // An empty intersection must match nothing, so it becomes a value no row has.
 function narrow(allowed: string[] | null, chosen: unknown): string[] | null {
@@ -191,8 +214,9 @@ async function handleAction(action: string, p: any, session: Session, scope: Sco
     }
 
     case "dashboard": {
-      const f = readFilters(p);
       scope = effectiveScope(scope, p);
+      const updatedAtP = dataUpdatedAt(admin);
+      const f = await withDefaultYear(admin, readFilters(p), p, scope);
       // The month chart needs a single year: the filtered one, else the latest year with data.
       const monthYearP = f.nam
         ? Promise.resolve(f.nam)
@@ -206,12 +230,24 @@ async function handleAction(action: string, p: any, session: Session, scope: Sco
         kpi(admin, "ly_do", f, scope),
         monthYearP.then(async (y) => [y, y ? await kpi(admin, "thang", { ...f, nam: y }, scope) : []] as const),
       ]);
-      return { ok: true, total: total[0] ?? null, bu, nhom, mien, sale, lyDo, monthYear, thang };
+      return {
+        ok: true,
+        nam: f.nam ?? null,
+        updatedAt: await updatedAtP,
+        total: total[0] ?? null,
+        bu,
+        nhom,
+        mien,
+        sale,
+        lyDo,
+        monthYear,
+        thang,
+      };
     }
 
     case "items": {
-      const f = readFilters(p);
       scope = effectiveScope(scope, p);
+      const f = await withDefaultYear(admin, readFilters(p), p, scope);
       const page = Math.max(1, Number(p?.page) || 1);
       const kq = KET_QUA.has(p?.kq) ? p.kq : undefined;
       const q = sanitizeSearch(p?.q);

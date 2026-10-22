@@ -40,12 +40,19 @@ export function StatCard({ label, value, sub, swatch }: { label: string; value: 
 }
 
 /** Headline win rate with a progress bar (sale-target "% Thực hiện" card). */
-export function WinRateCard({ r }: { r: KpiRow }) {
+export function WinRateCard({ r, updatedAt }: { r: KpiRow; updatedAt: string | null }) {
   const rate = winRate(r);
   const pct = rate === null ? 0 : Math.round(rate * 1000) / 10;
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3.5">
-      <div className="mb-2 text-[11px] tracking-wide text-slate-400">Tỷ lệ trúng thầu</div>
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 text-[11px] tracking-wide text-slate-400">
+        <span>Tỷ lệ trúng thầu</span>
+        {updatedAt && (
+          <span>
+            Dữ liệu cập nhật đến ngày <b className="font-bold text-slate-700">{updatedAt}</b>
+          </span>
+        )}
+      </div>
       <div className="mb-1.5 flex items-center justify-between">
         <span className="text-[13px] font-semibold text-slate-800">
           {fmtInt(r.trung)} / {fmtInt(r.trung + r.truot)} gói thầu có kết quả
