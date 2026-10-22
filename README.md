@@ -52,6 +52,20 @@ Link chia sẻ chỉ mở được khi đã đăng nhập tài khoản trong t�
 .venv/Scripts/python -m etl --force       # đẩy lên kể cả khi file không đổi
 ```
 
+## Chạy tự động (Windows Task Scheduler)
+
+Task **Bidding ETL** chạy [scripts/run_etl_scheduled.py](scripts/run_etl_scheduled.py) bằng `.venv\Scripts\pythonw.exe`, nên không mở cửa sổ console.
+
+- Lịch chạy: mỗi ngày từ 08:00 đến 18:00, cách 2 giờ một lần, dưới tài khoản Windows đang đăng nhập (cần OneDrive đồng bộ file về máy).
+- Sheet không đổi thì được bỏ qua, nên chạy thường xuyên cũng không ghi lại dữ liệu.
+- Log ghi thêm vào `logs/etl-YYYYMMDD.log` (đã gitignore).
+
+```powershell
+Start-ScheduledTask -TaskName 'Bidding ETL'                     # chạy ngay
+Get-ScheduledTaskInfo -TaskName 'Bidding ETL'                   # lần chạy gần nhất / kế tiếp
+Unregister-ScheduledTask -TaskName 'Bidding ETL' -Confirm:$false  # gỡ lịch
+```
+
 ## Các bước làm sạch
 
 - Tự dò dòng tiêu đề, bỏ các dòng tiêu đề báo cáo phía trên (ghi đè bằng `HEADER_ROW`).

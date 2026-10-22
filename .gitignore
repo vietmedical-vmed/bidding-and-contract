@@ -9,3 +9,4 @@ supabase/functions/.env.local
 supabase/.temp/
 supabase/.branches/
 supabase/test-users.local.txt
+logs/
