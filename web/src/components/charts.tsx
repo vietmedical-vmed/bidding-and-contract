@@ -222,13 +222,8 @@ function MonthRateLine({ rows }: { rows: KpiRow[] }) {
 
   return (
     <div className="flex gap-2">
-      <div className="relative h-20 w-8 text-right text-[11px] tabular-nums text-slate-400">
-        {[0, 50, 100].map((t) => (
-          <span key={t} className="absolute right-0 -translate-y-1/2" style={{ bottom: `${t}%` }}>
-            {t}%
-          </span>
-        ))}
-      </div>
+      {/* Left gutter matches the column chart's axis so months line up; the % scale sits on the right. */}
+      <div className="w-8 shrink-0" aria-hidden />
       <div className="relative h-20 flex-1">
         {[0, 50, 100].map((t) => (
           <div key={t} className="absolute inset-x-0 border-t border-slate-100" style={{ bottom: `${t}%` }} />
@@ -261,6 +256,13 @@ function MonthRateLine({ rows }: { rows: KpiRow[] }) {
             </div>
           ) : null,
         )}
+      </div>
+      <div className="relative h-20 w-8 shrink-0 text-left text-[11px] tabular-nums text-slate-400">
+        {[0, 50, 100].map((t) => (
+          <span key={t} className="absolute left-0 -translate-y-1/2" style={{ bottom: `${t}%` }}>
+            {t}%
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -345,6 +347,8 @@ export function MonthColumns({ rows }: { rows: KpiRow[] }) {
             ))}
           </div>
         </div>
+        {/* Right gutter matches the win-rate scale above, so both charts share the same month slots. */}
+        <div className="w-8 shrink-0" aria-hidden />
       </div>
     </div>
   );
