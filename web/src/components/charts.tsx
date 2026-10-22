@@ -193,74 +193,157 @@ export function BreakdownTable({
   );
 }
 
-/** Stacked columns by month (T4 → T3), Trúng at the baseline. */
+// Each sheet is a fiscal year: T4 of year N through T3 of year N+1.
+const FISCAL_MONTHS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+const RATE_LINE = "#3a3b3c"; // neutral ink: the rate is not one of the outcome series
+
+/**
+ * Win-rate line by month, in its own 0–100% band above the columns (one scale per chart,
+ * never a second y-axis). Months are slots of a 12-column grid, aligned with MonthColumns.
+ */
+function MonthRateLine({ rows }: { rows: KpiRow[] }) {
+  const byMonth = new Map(rows.map((r) => [Number(r.grp), r]));
+  const points = FISCAL_MONTHS.map((m, i) => {
+    const r = byMonth.get(m);
+    const rate = r ? winRate(r) : null;
+    return rate === null ? null : { x: ((i + 0.5) / 12) * 100, y: (1 - rate) * 100, rate, m };
+  });
+  // Months with no decided package break the line instead of being drawn as 0%.
+  const segments: { x: number; y: number }[][] = [];
+  let current: { x: number; y: number }[] = [];
+  for (const pt of points) {
+    if (pt) current.push(pt);
+    else if (current.length) {
+      segments.push(current);
+      current = [];
+    }
+  }
+  if (current.length) segments.push(current);
+
+  return (
+    <div className="flex gap-2">
+      <div className="relative h-20 w-8 text-right text-[11px] tabular-nums text-slate-400">
+        {[0, 50, 100].map((t) => (
+          <span key={t} className="absolute right-0 -translate-y-1/2" style={{ bottom: `${t}%` }}>
+            {t}%
+          </span>
+        ))}
+      </div>
+      <div className="relative h-20 flex-1">
+        {[0, 50, 100].map((t) => (
+          <div key={t} className="absolute inset-x-0 border-t border-slate-100" style={{ bottom: `${t}%` }} />
+        ))}
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible">
+          {segments.map((seg, i) => (
+            <polyline
+              key={i}
+              points={seg.map((p) => `${p.x},${p.y}`).join(" ")}
+              fill="none"
+              stroke={RATE_LINE}
+              strokeWidth={2}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+        </svg>
+        {points.map((p) =>
+          p ? (
+            <div key={p.m} className="absolute" style={{ left: `${p.x}%`, top: `${p.y}%` }}>
+              <span
+                className="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white"
+                style={{ background: RATE_LINE }}
+                title={`Tháng ${p.m}: ${fmtPct(p.rate)}`}
+              />
+              <span className="absolute -translate-x-1/2 -translate-y-[150%] whitespace-nowrap text-[10px] font-semibold tabular-nums text-slate-700">
+                {fmtPct(p.rate)}
+              </span>
+            </div>
+          ) : null,
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Stacked columns by month (T4 → T3), Trúng at the baseline, total packages on top. */
 export function MonthColumns({ rows }: { rows: KpiRow[] }) {
   const byMonth = new Map(rows.map((r) => [Number(r.grp), r]));
-  // Each sheet is a fiscal year: T4 of year N through T3 of year N+1.
-  const months = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
   const ticks = niceTicks(Math.max(1, ...rows.map((r) => r.goi)));
   const top = ticks[ticks.length - 1];
   const stackOrder = [...SERIES].reverse();
 
   return (
-    <div className="flex gap-2 px-4 pb-3 pt-5">
-      <div className="relative h-44 w-8 text-right text-[11px] tabular-nums text-slate-400">
-        {ticks.map((t) => (
-          <span key={t} className="absolute right-0 -translate-y-1/2" style={{ bottom: `${(t / top) * 100}%` }}>
-            {fmtInt(t)}
-          </span>
-        ))}
+    <div className="space-y-1 px-4 pb-3 pt-6">
+      <div className="flex items-center gap-1.5 pl-10 text-[11px] text-slate-500">
+        <span className="inline-block h-0.5 w-4 rounded" style={{ background: RATE_LINE }} aria-hidden />
+        Tỷ lệ trúng (gói trúng / gói đã có kết quả)
       </div>
-      <div className="flex-1">
-        <div className="relative h-44 border-b border-slate-300">
-          {ticks.slice(1).map((t) => (
-            <div key={t} className="absolute inset-x-0 border-t border-slate-100" style={{ bottom: `${(t / top) * 100}%` }} />
-          ))}
-          <div className="absolute inset-0 flex items-end justify-around">
-            {months.map((m) => {
-              const r = byMonth.get(m);
-              if (!r) return <div key={m} className="w-10" />;
-              const p = parts(r);
-              return (
-                <div key={m} className="group relative flex h-full w-10 items-end justify-center">
-                  <div className="flex w-6 flex-col gap-px" style={{ height: `${(r.goi / top) * 100}%` }}>
-                    {stackOrder.map((s) =>
-                      p[s.key] > 0 ? (
-                        <div
-                          key={s.key}
-                          className={`${s.color} w-full first:rounded-t-sm`}
-                          style={{ flexGrow: p[s.key], flexBasis: 0, minHeight: 2 }}
-                        />
-                      ) : null,
-                    )}
-                  </div>
-                  <div className="pointer-events-none absolute bottom-1/2 left-1/2 z-20 hidden w-48 -translate-x-1/2 rounded-md border border-slate-200 bg-white p-2.5 text-[12px] shadow-lg group-hover:block">
-                    <div className="mb-1 font-semibold text-slate-800">Tháng {m}</div>
-                    {SERIES.map((s) => (
-                      <div key={s.key} className="flex justify-between text-slate-500">
-                        <span className="flex items-center gap-1.5">
-                          <span className={`h-2 w-2 rounded-sm ${s.color}`} />
-                          {s.label}
-                        </span>
-                        <span className="tabular-nums text-slate-800">{fmtInt(p[s.key])}</span>
-                      </div>
-                    ))}
-                    <div className="mt-1 flex justify-between border-t border-slate-100 pt-1 text-slate-500">
-                      <span>Tỷ lệ trúng</span>
-                      <span className="font-semibold tabular-nums text-slate-800">{fmtPct(winRate(r))}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        <div className="flex justify-around pt-1 text-[11px] text-slate-400">
-          {months.map((m) => (
-            <span key={m} className="w-10 text-center">
-              T{m}
+      <div className="pt-5">
+        <MonthRateLine rows={rows} />
+      </div>
+      <div className="flex gap-2 pt-8">
+        <div className="relative h-44 w-8 text-right text-[11px] tabular-nums text-slate-400">
+          {ticks.map((t) => (
+            <span key={t} className="absolute right-0 -translate-y-1/2" style={{ bottom: `${(t / top) * 100}%` }}>
+              {fmtInt(t)}
             </span>
           ))}
+        </div>
+        <div className="flex-1">
+          <div className="relative h-44 border-b border-slate-300">
+            {ticks.slice(1).map((t) => (
+              <div key={t} className="absolute inset-x-0 border-t border-slate-100" style={{ bottom: `${(t / top) * 100}%` }} />
+            ))}
+            <div className="absolute inset-0 grid grid-cols-12 items-end">
+              {FISCAL_MONTHS.map((m) => {
+                const r = byMonth.get(m);
+                if (!r) return <div key={m} />;
+                const p = parts(r);
+                return (
+                  <div key={m} className="group relative flex h-full items-end justify-center">
+                    <div className="relative flex w-6 flex-col gap-px" style={{ height: `${(r.goi / top) * 100}%` }}>
+                      <span className="absolute bottom-full left-1/2 mb-0.5 -translate-x-1/2 text-[11px] font-semibold tabular-nums text-slate-700">
+                        {fmtInt(r.goi)}
+                      </span>
+                      {stackOrder.map((s) =>
+                        p[s.key] > 0 ? (
+                          <div
+                            key={s.key}
+                            className={`${s.color} w-full first:rounded-t-sm`}
+                            style={{ flexGrow: p[s.key], flexBasis: 0, minHeight: 2 }}
+                          />
+                        ) : null,
+                      )}
+                    </div>
+                    <div className="pointer-events-none absolute bottom-1/2 left-1/2 z-20 hidden w-48 -translate-x-1/2 rounded-md border border-slate-200 bg-white p-2.5 text-[12px] shadow-lg group-hover:block">
+                      <div className="mb-1 font-semibold text-slate-800">Tháng {m}</div>
+                      {SERIES.map((s) => (
+                        <div key={s.key} className="flex justify-between text-slate-500">
+                          <span className="flex items-center gap-1.5">
+                            <span className={`h-2 w-2 rounded-sm ${s.color}`} />
+                            {s.label}
+                          </span>
+                          <span className="tabular-nums text-slate-800">{fmtInt(p[s.key])}</span>
+                        </div>
+                      ))}
+                      <div className="mt-1 flex justify-between border-t border-slate-100 pt-1 text-slate-500">
+                        <span>Tỷ lệ trúng</span>
+                        <span className="font-semibold tabular-nums text-slate-800">{fmtPct(winRate(r))}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="grid grid-cols-12 pt-1 text-[11px] text-slate-400">
+            {FISCAL_MONTHS.map((m) => (
+              <span key={m} className="text-center">
+                T{m}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </div>
