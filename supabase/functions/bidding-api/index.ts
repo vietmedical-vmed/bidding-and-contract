@@ -278,32 +278,60 @@ async function handleAction(action: string, p: any, session: Session, scope: Sco
     }
 
     case "missing-info": {
-      // Packages whose items lack fields the dashboard groups by, with the Excel rows to fix.
+      // Packages whose items lack fields the dashboard groups by, or whose items disagree on
+      // the region (a package belongs to one miền), with the Excel rows to fix.
       scope = effectiveScope(scope, p);
       const f = await withDefaultYear(admin, readFilters(p), p, scope);
-      let query = admin
-        .from("bid_items")
-        .select("nam,so_tbmt,ben_moi_thau,ten_goi_thau,sheet_name,source_row,phan_loai,nhom_san_pham,mien,sale")
-        .or("nhom_san_pham.is.null,mien.is.null,sale.is.null");
-      if (f.nam) query = query.eq("nam", f.nam);
-      if (f.bu) query = query.eq("bu", f.bu);
-      if (f.sale) query = query.eq("sale", f.sale);
-      if (scope.mienIn) query = query.in("mien", scope.mienIn);
-      if (scope.nhomIn) query = query.in("nhom_san_pham", scope.nhomIn);
-      const { data, error } = await query
-        .order("nam", { ascending: false })
-        .order("so_tbmt")
-        .order("source_row")
-        .range(0, 1999);
-      if (error) throw new Error(error.message);
+
+      // Every item in the filters is needed to spot region conflicts; hosted PostgREST returns
+      // at most 1000 rows per request, so read page by page.
+      type Row = {
+        nam: number; so_tbmt: string | null; ben_moi_thau: string | null; ten_goi_thau: string | null;
+        sheet_name: string; source_row: number; phan_loai: string | null; nhom_san_pham: string | null;
+        mien: string | null; sale: string | null;
+      };
+      const data: Row[] = [];
+      for (let from = 0; ; from += 1000) {
+        let query = admin
+          .from("bid_items")
+          .select("nam,so_tbmt,ben_moi_thau,ten_goi_thau,sheet_name,source_row,phan_loai,nhom_san_pham,mien,sale");
+        if (f.nam) query = query.eq("nam", f.nam);
+        if (f.bu) query = query.eq("bu", f.bu);
+        if (f.sale) query = query.eq("sale", f.sale);
+        if (scope.mienIn) query = query.in("mien", scope.mienIn);
+        if (scope.nhomIn) query = query.in("nhom_san_pham", scope.nhomIn);
+        const { data: page, error } = await query
+          .order("nam", { ascending: false })
+          .order("so_tbmt")
+          .order("source_row")
+          .range(from, from + 999);
+        if (error) throw new Error(error.message);
+        data.push(...((page ?? []) as Row[]));
+        if (!page || page.length < 1000) break;
+      }
+
+      // Regions used by each package, to flag packages split across several.
+      const pkgKey = (r: Row) => `${r.nam}|${r.so_tbmt ?? `row-${r.source_row}`}`;
+      const regionsOf = new Map<string, Set<string>>();
+      for (const r of data) {
+        if (!r.mien) continue;
+        const set = regionsOf.get(pkgKey(r)) ?? new Set<string>();
+        set.add(r.mien);
+        regionsOf.set(pkgKey(r), set);
+      }
 
       type Gap = { field: string; rows: number[]; note?: string };
       const packages = new Map<string, {
         nam: number; so_tbmt: string | null; ben_moi_thau: string | null; ten_goi_thau: string | null;
         sheet: string; gaps: Map<string, Gap>;
       }>();
-      for (const r of data ?? []) {
-        const key = `${r.nam}|${r.so_tbmt ?? `row-${r.source_row}`}`;
+      const flagged = new Set<Row>();
+      for (const r of data) {
+        const key = pkgKey(r);
+        const regions = regionsOf.get(key);
+        const regionConflict = Boolean(regions && regions.size > 1);
+        if (r.nhom_san_pham && r.mien && r.sale && !regionConflict) continue;
+
         let pkg = packages.get(key);
         if (!pkg) {
           pkg = { nam: r.nam, so_tbmt: r.so_tbmt, ben_moi_thau: r.ben_moi_thau, ten_goi_thau: r.ten_goi_thau, sheet: r.sheet_name, gaps: new Map() };
@@ -313,15 +341,17 @@ async function handleAction(action: string, p: any, session: Session, scope: Sco
           const gap = pkg!.gaps.get(field + (note ?? "")) ?? { field, rows: [], note };
           gap.rows.push(r.source_row);
           pkg!.gaps.set(field + (note ?? ""), gap);
+          flagged.add(r);
         };
         if (!r.nhom_san_pham) {
           add("Phân loại", r.phan_loai ? `"${r.phan_loai}" chưa có trong bảng mapping nhóm sản phẩm` : undefined);
         }
         if (!r.mien) add("Miền");
+        else if (regionConflict) add("Miền không thống nhất", `ghi "${r.mien}", các dòng khác của gói ghi miền khác`);
         if (!r.sale) add("Sale");
       }
       const list = [...packages.values()].map((pkg) => ({ ...pkg, gaps: [...pkg.gaps.values()] }));
-      return { ok: true, nam: f.nam ?? null, packages: list, items: (data ?? []).length };
+      return { ok: true, nam: f.nam ?? null, packages: list, items: flagged.size };
     }
 
     default:

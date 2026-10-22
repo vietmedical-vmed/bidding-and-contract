@@ -51,19 +51,20 @@ export function MissingInfoButton({ filters }: { filters: Filters }) {
         className="flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[13px] font-medium text-amber-800 hover:bg-amber-100"
       >
         <AlertTriangle size={14} />
-        {fmtInt(pkgs.length)} gói thầu thiếu thông tin
+        {fmtInt(pkgs.length)} gói thầu cần cập nhật thông tin
       </button>
       <Modal
         open={open}
         onClose={() => setOpen(false)}
         width={860}
-        title={`Gói thầu thiếu thông tin${res.data?.nam ? ` – năm ${res.data.nam}` : ""}`}
+        title={`Gói thầu cần cập nhật thông tin${res.data?.nam ? ` – năm ${res.data.nam}` : ""}`}
         icon={<AlertTriangle size={16} className="text-amber-500" />}
       >
         <div className="border-b border-amber-100 bg-amber-50 px-4 py-2.5 text-[12px] leading-relaxed text-amber-900">
-          {fmtInt(pkgs.length)} gói thầu ({fmtInt(res.data?.items ?? 0)} mặt hàng) thiếu thông tin nên đang nằm ở dòng
-          &nbsp;<b>(Chưa phân loại)</b> / <b>(Chưa ghi miền)</b> trên dashboard. Vui lòng bổ sung trong file Excel báo cáo
-          thầu theo sheet và số dòng bên dưới; dữ liệu sẽ tự cập nhật ở lần đồng bộ tiếp theo.
+          {fmtInt(pkgs.length)} gói thầu ({fmtInt(res.data?.items ?? 0)} mặt hàng) thiếu hoặc ghi chưa đúng thông tin:
+          mặt hàng thiếu thông tin đang nằm ở dòng <b>(Chưa phân loại)</b> / <b>(Chưa ghi miền)</b>; gói có mặt hàng ghi
+          nhiều miền khác nhau bị tính ở cả các miền đó. Vui lòng sửa trong file Excel báo cáo thầu theo sheet và số dòng
+          bên dưới; dữ liệu sẽ tự cập nhật ở lần đồng bộ tiếp theo.
         </div>
         <div className="scroll-shadow max-h-[60vh] overflow-auto">
           <table className="w-full border-collapse text-[13px]">
