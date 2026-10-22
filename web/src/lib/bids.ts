@@ -1,14 +1,15 @@
+/** Counts are gói thầu (packages); trung/truot/huy/cho_kq split them by package outcome. */
 export type KpiRow = {
   grp: string | null;
-  items: number;
+  goi: number;
   trung: number;
   truot: number;
   huy: number;
   cho_kq: number;
+  mat_hang: number;
   gia_tri_du_thau: number;
   gia_tri_da_co_kq: number;
   gia_tri_du_thau_trung: number;
-  gia_tri_trung: number;
 };
 
 export type FilterOptions = {
@@ -59,19 +60,19 @@ export function toQuery(f: Partial<Filters>, extra: Record<string, QueryValue> =
 export function toKpiRow(r: Record<string, unknown>): KpiRow {
   return {
     grp: (r.grp as string | null) ?? null,
-    items: Number(r.items),
-    trung: Number(r.trung),
-    truot: Number(r.truot),
-    huy: Number(r.huy),
-    cho_kq: Number(r.cho_kq),
+    goi: Number(r.goi),
+    trung: Number(r.goi_trung),
+    truot: Number(r.goi_truot),
+    huy: Number(r.goi_huy),
+    cho_kq: Number(r.goi_cho_kq),
+    mat_hang: Number(r.mat_hang),
     gia_tri_du_thau: Number(r.gia_tri_du_thau),
     gia_tri_da_co_kq: Number(r.gia_tri_da_co_kq),
     gia_tri_du_thau_trung: Number(r.gia_tri_du_thau_trung),
-    gia_tri_trung: Number(r.gia_tri_trung),
   };
 }
 
-/** Win rate by item count, over items that already have a result (won or lost). */
+/** Win rate by package count, over packages that already have a result (won or lost). */
 export function winRate(r: Pick<KpiRow, "trung" | "truot">): number | null {
   const decided = r.trung + r.truot;
   return decided ? r.trung / decided : null;

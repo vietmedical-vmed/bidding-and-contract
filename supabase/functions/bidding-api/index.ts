@@ -148,13 +148,12 @@ function sanitizeSearch(s: string): string {
   return String(s ?? "").replace(/[,()*\\%]/g, " ").trim();
 }
 
+// KPI counted by gói thầu (see migration 20261022000400_bid_package_kpi.sql).
 async function kpi(admin: SupabaseClient, group: string | null, f: Filters, scope: Scope) {
-  const { data, error } = await admin.rpc("bid_kpi", {
+  const { data, error } = await admin.rpc("bid_package_kpi", {
     p_group: group,
     p_nam: f.nam ?? null,
     p_bu: f.bu ?? null,
-    p_nhom: null,
-    p_mien: null,
     p_sale: f.sale ?? null,
     p_mien_in: scope.mienIn,
     p_nhom_in: scope.nhomIn,

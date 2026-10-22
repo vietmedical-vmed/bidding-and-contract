@@ -53,7 +53,7 @@ function Dashboard() {
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,3fr)]">
           <WinRateCard r={total} />
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-            <StatCard label="Mặt hàng dự thầu" value={fmtInt(total.items)} />
+            <StatCard label="Gói thầu dự thầu" value={fmtInt(total.goi)} sub={`${fmtInt(total.mat_hang)} mặt hàng`} />
             <StatCard label="Trúng" value={fmtInt(total.trung)} swatch="bg-won" />
             <StatCard label="Trượt" value={fmtInt(total.truot)} swatch="bg-lost" />
             <StatCard label="Chưa có kết quả" value={fmtInt(total.cho_kq + total.huy)} swatch="bg-pending" />
@@ -77,7 +77,7 @@ function Dashboard() {
         <Panel title="Theo nhóm sản phẩm" right={<Legend />}>
           <BreakdownTable dimension="Nhóm SP" rows={rows(d.nhom)} hrefFor={(g) => detail({ nhom: [g] })} />
         </Panel>
-        <Panel title="Lý do trượt" subtitle="Số mặt hàng trượt theo lý do">
+        <Panel title="Lý do trượt" subtitle="Số gói thầu có mặt hàng trượt, theo lý do">
           <ReasonBars rows={reasons} />
         </Panel>
       </div>
@@ -92,7 +92,7 @@ function Dashboard() {
         </Panel>
       )}
 
-      <Panel title="Theo sale" subtitle="Bấm tên để xem các mặt hàng" right={<Legend />}>
+      <Panel title="Theo sale" subtitle="Bấm tên để xem các mặt hàng của sale đó" right={<Legend />}>
         <BreakdownTable dimension="Sale" rows={rows(d.sale)} hrefFor={(g) => detail({ sale: g })} emptyLabel="(Chưa ghi sale)" />
       </Panel>
     </div>

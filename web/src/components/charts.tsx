@@ -48,7 +48,7 @@ export function WinRateCard({ r }: { r: KpiRow }) {
       <div className="mb-2 text-[11px] tracking-wide text-slate-400">Tỷ lệ trúng thầu</div>
       <div className="mb-1.5 flex items-center justify-between">
         <span className="text-[13px] font-semibold text-slate-800">
-          {fmtInt(r.trung)} / {fmtInt(r.trung + r.truot)} mặt hàng có kết quả
+          {fmtInt(r.trung)} / {fmtInt(r.trung + r.truot)} gói thầu có kết quả
         </span>
         <span className="text-[22px] font-bold tabular-nums text-blue-600">{fmtPct(rate)}</span>
       </div>
@@ -56,7 +56,8 @@ export function WinRateCard({ r }: { r: KpiRow }) {
         <div className="h-full rounded bg-won" style={{ width: `${pct}%` }} />
       </div>
       <div className="text-[11px] text-slate-400">
-        Theo giá trị dự thầu: <b className="font-medium text-slate-500">{fmtPct(valueWinRate(r))}</b>
+        Gói trúng = trúng ít nhất 1 mặt hàng. Theo giá trị dự thầu:{" "}
+        <b className="font-medium text-slate-500">{fmtPct(valueWinRate(r))}</b>
       </div>
     </div>
   );
@@ -100,14 +101,14 @@ export function BreakdownTable({
   hrefFor?: (grp: string) => string;
   emptyLabel?: string;
 }) {
-  const max = Math.max(1, ...rows.map((r) => r.items));
+  const max = Math.max(1, ...rows.map((r) => r.goi));
   return (
     <div className="scroll-shadow overflow-x-auto">
       <table className="w-full min-w-[640px] border-collapse text-[13px]">
         <thead>
           <tr className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
             <th className="px-4 py-2 text-left font-semibold">{dimension}</th>
-            <th className="px-2 py-2 text-left font-semibold">Mặt hàng</th>
+            <th className="px-2 py-2 text-left font-semibold">Gói thầu</th>
             <th className="px-2 py-2 text-right font-semibold">Trúng</th>
             <th className="px-2 py-2 text-right font-semibold">Trượt</th>
             <th className="px-2 py-2 text-right font-semibold">Chưa KQ</th>
@@ -134,7 +135,7 @@ export function BreakdownTable({
                   <div className="flex items-center gap-2">
                     <div
                       className="flex h-2.5 gap-px overflow-hidden rounded-sm"
-                      style={{ width: `${Math.max(4, (r.items / max) * 120)}px` }}
+                      style={{ width: `${Math.max(4, (r.goi / max) * 120)}px` }}
                       title={`Trúng ${p.trung} · Trượt ${p.truot} · Chưa KQ ${p.pending}`}
                     >
                       {SERIES.map((s) =>
@@ -143,7 +144,7 @@ export function BreakdownTable({
                         ) : null,
                       )}
                     </div>
-                    <span className="tabular-nums text-slate-600">{fmtInt(r.items)}</span>
+                    <span className="tabular-nums text-slate-600">{fmtInt(r.goi)}</span>
                   </div>
                 </td>
                 <td className="px-2 py-1.5 text-right tabular-nums text-slate-700">{fmtInt(r.trung)}</td>
@@ -171,7 +172,7 @@ export function BreakdownTable({
 export function MonthColumns({ rows }: { rows: KpiRow[] }) {
   const byMonth = new Map(rows.map((r) => [Number(r.grp), r]));
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
-  const ticks = niceTicks(Math.max(1, ...rows.map((r) => r.items)));
+  const ticks = niceTicks(Math.max(1, ...rows.map((r) => r.goi)));
   const top = ticks[ticks.length - 1];
   const stackOrder = [...SERIES].reverse();
 
@@ -196,7 +197,7 @@ export function MonthColumns({ rows }: { rows: KpiRow[] }) {
               const p = parts(r);
               return (
                 <div key={m} className="group relative flex h-full w-10 items-end justify-center">
-                  <div className="flex w-6 flex-col gap-px" style={{ height: `${(r.items / top) * 100}%` }}>
+                  <div className="flex w-6 flex-col gap-px" style={{ height: `${(r.goi / top) * 100}%` }}>
                     {stackOrder.map((s) =>
                       p[s.key] > 0 ? (
                         <div
@@ -268,7 +269,7 @@ export function ReasonBars({ rows }: { rows: { label: string; value: number }[] 
           </div>
         </li>
       ))}
-      {rows.length === 0 && <li className="py-3 text-center text-slate-400">Không có mặt hàng trượt</li>}
+      {rows.length === 0 && <li className="py-3 text-center text-slate-400">Không có gói thầu trượt</li>}
     </ul>
   );
 }
