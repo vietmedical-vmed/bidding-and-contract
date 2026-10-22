@@ -111,7 +111,7 @@ export function BreakdownTable({
   const max = Math.max(1, ...rows.map((r) => r.goi));
   return (
     <div className="scroll-shadow overflow-x-auto">
-      <table className="w-full min-w-[640px] border-collapse text-[13px]">
+      <table className="w-full min-w-[720px] border-collapse text-[13px]">
         <thead>
           <tr className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
             <th className="px-4 py-2 text-left font-semibold">{dimension}</th>
@@ -120,6 +120,7 @@ export function BreakdownTable({
             <th className="px-2 py-2 text-right font-semibold">Trượt</th>
             <th className="px-2 py-2 text-right font-semibold">Chưa KQ</th>
             <th className="px-2 py-2 text-right font-semibold">Tỷ lệ trúng</th>
+            <th className="px-2 py-2 text-right font-semibold">Giá trị dự thầu</th>
             <th className="px-4 py-2 text-right font-semibold">Giá trị trúng</th>
           </tr>
         </thead>
@@ -158,13 +159,14 @@ export function BreakdownTable({
                 <td className="px-2 py-1.5 text-right tabular-nums text-slate-700">{fmtInt(r.truot)}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums text-slate-400">{fmtInt(p.pending)}</td>
                 <td className="px-2 py-1.5 text-right font-semibold tabular-nums text-slate-800">{fmtPct(winRate(r))}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">{fmtVnd(r.gia_tri_du_thau)}</td>
                 <td className="px-4 py-1.5 text-right tabular-nums text-slate-600">{fmtVnd(r.gia_tri_du_thau_trung)}</td>
               </tr>
             );
           })}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={7} className="px-4 py-6 text-center text-slate-400">
+              <td colSpan={8} className="px-4 py-6 text-center text-slate-400">
                 Không có dữ liệu
               </td>
             </tr>
