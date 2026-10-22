@@ -284,9 +284,9 @@ async function handleAction(action: string, p: any, session: Session, scope: Sco
       }
 
       const from = (page - 1) * PAGE_SIZE;
+      // Newest bid month first, in calendar order (ky_du_thau: migration 20261022000500).
       const { data, count, error } = await query
-        .order("nam", { ascending: false })
-        .order("thang_du_thau_so", { ascending: false, nullsFirst: false })
+        .order("ky_du_thau", { ascending: false, nullsFirst: false })
         .order("so_tbmt")
         .order("source_row")
         .range(from, from + PAGE_SIZE - 1);
