@@ -1,4 +1,18 @@
-# Bidding management – ETL
+# Thầu & Hợp đồng
+
+Gộp hai project cũ `bidding-management` (kết quả thầu) và `contract-management` (theo dõi hợp đồng trúng thầu). Cả hai dùng chung Supabase project `nrfxymnfmjhbsgpipvkb` và chung một web app.
+
+| Thư mục | Nội dung |
+|---|---|
+| [web/](web/) | Web app Next.js (trang tĩnh trên GitHub Pages): module Kết quả thầu (`/thau/`) và Hợp đồng (`/hop-dong/`). |
+| [etl/](etl/), [mapping/](mapping/), [scripts/](scripts/) | ETL dữ liệu thầu từ Excel lên Supabase (mô tả bên dưới). |
+| [supabase/functions/](supabase/functions/) | Edge Functions `bidding-login` (đăng nhập chung), `bidding-api`, `contract-api`. |
+| [supabase/migrations/](supabase/migrations/) | Migration phần thầu, chạy bằng `supabase db push`. |
+| [supabase/contract/](supabase/contract/) | SQL phần hợp đồng, chạy tay (xem [Hợp đồng](#hợp-đồng)). |
+
+Lịch sử commit của cả hai repo cũ được giữ nguyên trong repo này.
+
+# Kết quả thầu – ETL
 
 Script tải file báo cáo thầu (Excel trên SharePoint), làm sạch dữ liệu rồi đẩy lên Supabase.
 
@@ -86,4 +100,36 @@ Unregister-ScheduledTask -TaskName 'Bidding ETL' -Confirm:$false  # gỡ lịch
 
 ## Web app
 
-Dashboard và bảng chi tiết nằm trong thư mục [web/](web/). App là trang tĩnh trên GitHub Pages, đăng nhập bằng tài khoản dùng chung `shared.users` qua 2 Edge Function `bidding-login` và `bidding-api`, giống các app khác của org. Cách cấu hình và deploy xem ở [web/README.md](web/README.md).
+Dashboard và bảng chi tiết nằm trong thư mục [web/](web/). App là trang tĩnh trên GitHub Pages, đăng nhập bằng tài khoản dùng chung `shared.users` qua Edge Function `bidding-login`, giống các app khác của org. Cách cấu hình và deploy xem ở [web/README.md](web/README.md).
+
+# Hợp đồng
+
+Theo dõi hợp đồng trúng thầu ngoại khoa (BU `CH&CS`, `CTTM & CTUT`, `THNS & CSVT`): hạn hợp đồng và số lượng còn lại so với số đã bán theo hóa đơn.
+
+## Dữ liệu trên Supabase
+
+- `contract_contracts`: thông tin hợp đồng (số HĐ, khách hàng, miền, thời hạn, `is_ngoai_khoa`).
+- `contract_items`: hàng hóa trong hợp đồng (mã chung, tên, số lượng, đơn giá).
+- `contract_sold_snapshot`: số lượng đã bán (join theo `so_hd` + `ma_chung`), cập nhật bằng `fn_sync_sold_snapshot`.
+- `contract_alert_config`: ngưỡng cảnh báo (số ngày trước hạn, % đã dùng).
+- `contract_expiry_view`: số ngày còn lại và nhóm trạng thái của từng hợp đồng.
+- `contract_items_remaining_view`: số lượng còn lại = số lượng HĐ − đã bán (đã bán đọc thẳng từ `app_contract.hoa_don_bovattu`).
+
+## SQL
+
+[supabase/contract/](supabase/contract/) chứa `schema.sql` và `migration_001` → `migration_015`. Các file này đã chạy trên production bằng tay, theo thứ tự số. Chúng không nằm trong `supabase/migrations/`, vì:
+
+- chúng phụ thuộc bảng của app khác (`shared.dm_vat_tu`, `shared.dm_bo_vat_tu`, `app_contract.hoa_don_bovattu`), nên không chạy được trên Supabase local;
+- `supabase db push` sẽ coi chúng là migration chưa chạy và chạy lại trên production.
+
+Thay đổi mới cho phần hợp đồng: thêm file `migration_016_...sql` vào đó rồi chạy bằng `supabase db query --linked -f <file>`.
+
+## Seed dữ liệu hợp đồng
+
+```bash
+pip install openpyxl
+python supabase/contract/seed.py        # đọc "Bảng kê Hợp đồng.xlsx" ở thư mục gốc
+supabase db query --linked -f supabase/contract/seed_data.sql
+```
+
+File Excel và `seed_data.sql` không đưa vào git.
