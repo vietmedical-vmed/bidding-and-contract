@@ -1,46 +1,90 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/components/AuthGate";
-import { FilterSelect } from "@/components/FilterSelect";
 import { AlertCircle, Loader2, LogOut, RefreshCw } from "@/components/icons";
-import { MissingInfoButton } from "@/components/MissingInfo";
-import { parseFilters, toQuery, type FilterOptions } from "@/lib/bids";
-import { ReloadContext, useApi } from "@/lib/useApi";
+import { ReloadContext } from "@/lib/useApi";
 
-const TABS = [
-  { href: "/", label: "Tổng quan" },
-  { href: "/chi-tiet/", label: "Chi tiết mặt hàng" },
-];
+export type ModuleId = "thau" | "hop-dong";
 
-/** Header, filter row and tabs in the sale-target layout; pages render below it. */
-export function AppShell({ children }: { children: React.ReactNode }) {
+const MODULES: Record<
+  ModuleId,
+  { title: string; label: string; filterKeys: string[]; tabs: { href: string; label: string }[] }
+> = {
+  thau: {
+    title: "KẾT QUẢ THẦU",
+    label: "Kết quả thầu",
+    filterKeys: ["nam", "bu", "nhom", "mien", "sale"],
+    tabs: [
+      { href: "/thau/", label: "Tổng quan" },
+      { href: "/thau/chi-tiet/", label: "Chi tiết mặt hàng" },
+    ],
+  },
+  "hop-dong": {
+    title: "QUẢN LÝ HỢP ĐỒNG",
+    label: "Hợp đồng",
+    filterKeys: ["bu", "nhom", "mien"],
+    tabs: [
+      { href: "/hop-dong/", label: "Tổng quan" },
+      { href: "/hop-dong/danh-sach/", label: "Danh sách hợp đồng" },
+    ],
+  },
+};
+
+const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
+  admin: { label: "Admin", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+  manager: { label: "Manager", cls: "bg-blue-50 text-blue-700 border-blue-200" },
+  product_manager: { label: "PM", cls: "bg-violet-50 text-violet-700 border-violet-200" },
+  area_manager: { label: "AM", cls: "bg-teal-50 text-teal-700 border-teal-200" },
+  ps: { label: "PS", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+};
+
+const isActive = (pathname: string, href: string) => pathname === href || pathname === href.replace(/\/$/, "");
+
+/**
+ * Header, module switch, filter row and tabs in the sale-target layout; pages render below it.
+ * Each module brings its own filter row; tabs of the same module keep its filters in the URL.
+ */
+export function AppShell({
+  module,
+  filters,
+  children,
+}: {
+  module: ModuleId;
+  filters: React.ReactNode;
+  children: React.ReactNode;
+}) {
   const [nonce, setNonce] = useState(0);
   return (
     <ReloadContext.Provider value={nonce}>
-      <Shell onReload={() => setNonce((n) => n + 1)}>{children}</Shell>
+      <Shell module={module} filters={filters} onReload={() => setNonce((n) => n + 1)}>
+        {children}
+      </Shell>
     </ReloadContext.Provider>
   );
 }
 
-function Shell({ onReload, children }: { onReload: () => void; children: React.ReactNode }) {
+function Shell({
+  module,
+  filters,
+  onReload,
+  children,
+}: {
+  module: ModuleId;
+  filters: React.ReactNode;
+  onReload: () => void;
+  children: React.ReactNode;
+}) {
   const { user, logout } = useAuth();
-  const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const f = parseFilters(params);
-  const options = useApi<{ options: FilterOptions }>("filter-options", {});
-  const opts = options.data?.options;
+  const m = MODULES[module];
 
-  function setFilter(key: string, values: string[]) {
-    const next = new URLSearchParams(params);
-    next.delete(key);
-    values.forEach((v) => next.append(key, v));
-    next.delete("page"); // any filter change starts from page 1
-    router.push(`${pathname}?${next.toString()}`);
-  }
+  const keep = new URLSearchParams();
+  for (const k of m.filterKeys) params.getAll(k).forEach((v) => keep.append(k, v));
+  const filterQuery = keep.toString();
 
   const initials = (user.ho_ten || user.username || "??")
     .split(/\s+/)
@@ -48,21 +92,37 @@ function Shell({ onReload, children }: { onReload: () => void; children: React.R
     .join("")
     .slice(0, 2)
     .toUpperCase();
-  // "Bỏ lọc" returns to the defaults, including the latest year.
-  const hasFilter = Boolean(f.nam || f.bu || f.sale || f.nhom.length || f.mien.length);
-  const filterQuery = toQuery(f);
+  const badge = ROLE_BADGE[user.role];
 
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
         <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-3">
-          <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-blue-500 text-sm font-bold text-white">
-              {initials}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <div className="flex items-center gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-blue-500 text-sm font-bold text-white">
+                {initials}
+              </div>
+              <div className="leading-tight">
+                <div className="text-base font-bold text-slate-900 md:text-lg">{m.title}</div>
+                <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
+                  {user.ho_ten || user.username}
+                  {badge && (
+                    <span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${badge.cls}`}>{badge.label}</span>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="leading-tight">
-              <div className="text-base font-bold text-slate-900 md:text-lg">KẾT QUẢ THẦU</div>
-              <div className="mt-0.5 text-xs text-slate-500">{user.ho_ten || user.username}</div>
+            <div className="flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 p-0.5">
+              {(Object.keys(MODULES) as ModuleId[]).map((id) => (
+                <Link
+                  key={id}
+                  href={MODULES[id].tabs[0].href}
+                  className={`rounded px-3 py-1 text-[13px] ${id === module ? "bg-white font-semibold text-blue-700 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+                >
+                  {MODULES[id].label}
+                </Link>
+              ))}
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -92,63 +152,19 @@ function Shell({ onReload, children }: { onReload: () => void; children: React.R
 
         <div className="flex flex-wrap items-center gap-2.5 border-t border-slate-100 px-6 py-2">
           <span className="pl-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Lọc</span>
-          {opts ? (
-            <>
-              <FilterSelect
-                label="Năm"
-                options={opts.nam.map(String)}
-                // No year in the URL means the latest year (the API applies the same default).
-                selected={f.nam === "all" ? [] : [String(f.nam ?? opts.nam[0] ?? "")].filter(Boolean)}
-                onChange={(v) => setFilter("nam", v.length ? v : ["all"])}
-              />
-              <FilterSelect label="BU" options={opts.bu} selected={f.bu ? [f.bu] : []} onChange={(v) => setFilter("bu", v)} />
-              <FilterSelect
-                label="Nhóm SP"
-                multiple
-                options={opts.nhom_san_pham}
-                selected={f.nhom}
-                onChange={(v) => setFilter("nhom", v)}
-              />
-              {opts.mien.length > 1 && (
-                <FilterSelect label="Miền" multiple options={opts.mien} selected={f.mien} onChange={(v) => setFilter("mien", v)} />
-              )}
-              <FilterSelect
-                label="Sale"
-                searchable
-                options={opts.sale}
-                selected={f.sale ? [f.sale] : []}
-                onChange={(v) => setFilter("sale", v)}
-              />
-              {hasFilter && (
-                <button
-                  type="button"
-                  onClick={() => router.push(pathname)}
-                  className="px-1 text-[13px] text-blue-600 hover:underline"
-                >
-                  Bỏ lọc
-                </button>
-              )}
-              <div className="flex-1" />
-              <MissingInfoButton filters={f} />
-            </>
-          ) : (
-            <span className="text-[12px] text-slate-400">{options.error ?? "Đang tải bộ lọc…"}</span>
-          )}
+          {filters}
         </div>
 
         <nav className="flex items-center gap-1 border-t border-slate-100 px-6">
-          {TABS.map((t) => {
-            const active = pathname === t.href || pathname === t.href.replace(/\/$/, "");
-            return (
-              <Link
-                key={t.href}
-                href={`${t.href}${filterQuery ? `?${filterQuery}` : ""}`}
-                className={`-mb-px border-b-2 px-3 py-2 text-[13px] font-medium transition-colors ${active ? "border-blue-500 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}
-              >
-                {t.label}
-              </Link>
-            );
-          })}
+          {m.tabs.map((t) => (
+            <Link
+              key={t.href}
+              href={`${t.href}${filterQuery ? `?${filterQuery}` : ""}`}
+              className={`-mb-px border-b-2 px-3 py-2 text-[13px] font-medium transition-colors ${isActive(pathname, t.href) ? "border-blue-500 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+            >
+              {t.label}
+            </Link>
+          ))}
         </nav>
       </header>
 

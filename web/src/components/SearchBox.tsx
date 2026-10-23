@@ -4,7 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Search } from "@/components/icons";
 
-export function SearchBox() {
+export function SearchBox({ placeholder = "Tìm mặt hàng, model, TBMT, bệnh viện…" }: { placeholder?: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -26,7 +26,7 @@ export function SearchBox() {
       <input
         type="search"
         className="w-72 rounded-md border border-slate-200 bg-white py-1.5 pl-8 pr-2.5 text-[13px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-        placeholder="Tìm mặt hàng, model, TBMT, bệnh viện…"
+        placeholder={placeholder}
         value={value}
         onChange={(e) => setValue(e.target.value)}
       />

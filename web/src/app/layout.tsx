@@ -3,8 +3,8 @@ import { AuthGate } from "@/components/AuthGate";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Kết quả thầu",
-  description: "Theo dõi tình hình trúng/trượt thầu theo năm, BU, nhóm sản phẩm, miền và sale.",
+  title: "Thầu & Hợp đồng",
+  description: "Kết quả trúng/trượt thầu và theo dõi hợp đồng trúng thầu: hạn hợp đồng, số lượng còn lại.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

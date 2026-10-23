@@ -1,13 +1,18 @@
-// Client for the bidding-login / bidding-api Edge Functions (org-wide login pattern,
-// same as contract-management, ccdc-management and sale-target).
+// Client for the bidding-login / bidding-api / contract-api Edge Functions (org-wide login
+// pattern, same as ccdc-management and sale-target). One token from bidding-login works for
+// both APIs, since every function in the project signs and checks it with TOKEN_SECRET.
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 const FN_LOGIN = "bidding-login";
-const FN_API = "bidding-api";
-const TOKEN_KEY = "bidding.token.v1";
-const USER_KEY = "bidding.user.v1";
+const FN_API = { bidding: "bidding-api", contract: "contract-api" } as const;
+// All org apps share the github.io origin, so the keys must not collide with the old
+// bidding-management / contract-management sites.
+const TOKEN_KEY = "bidding-contract.token.v1";
+const USER_KEY = "bidding-contract.user.v1";
 const TIMEOUT_MS = 45_000;
+
+export type Service = keyof typeof FN_API;
 
 export type User = {
   username: string;
@@ -115,8 +120,8 @@ export async function changePassword(username: string, password: string, newPass
   await call(FN_LOGIN, { username, password, newPassword }, "change-password");
 }
 
-export function api<T>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
-  return call<T>(FN_API, { action, token: read(TOKEN_KEY), payload }, action);
+export function api<T>(action: string, payload: Record<string, unknown> = {}, service: Service = "bidding"): Promise<T> {
+  return call<T>(FN_API[service], { action, token: read(TOKEN_KEY), payload }, `${service}:${action}`);
 }
 
 export function errorMessage(err: unknown): string {

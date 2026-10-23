@@ -92,7 +92,7 @@ function LoginGate() {
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- static export, no image optimizer */}
         <img src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/logo.png`} alt="VietMedical" className="mx-auto mb-6 block h-12" />
-        <h2 className="mb-5 text-center text-lg font-bold uppercase">{isChange ? "Đổi mật khẩu" : "Kết quả thầu"}</h2>
+        <h2 className="mb-5 text-center text-lg font-bold uppercase">{isChange ? "Đổi mật khẩu" : "Thầu & Hợp đồng"}</h2>
         <div className="space-y-2.5">
           <input
             autoFocus

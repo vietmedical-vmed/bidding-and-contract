@@ -4,8 +4,10 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingBlock, RefreshingBar } from "@/components/AppShell";
+import { BidFilters } from "@/components/BidFilters";
 import { FilterSelect } from "@/components/FilterSelect";
 import { ChevronLeft, ChevronRight } from "@/components/icons";
+import { PageLink } from "@/components/PageLink";
 import { SearchBox } from "@/components/SearchBox";
 import { fmtInt, parseFilters } from "@/lib/bids";
 import { useApi } from "@/lib/useApi";
@@ -69,7 +71,7 @@ const date = (v: string | null) => (v ? v.split("-").reverse().join("/") : "");
 export default function DetailPage() {
   return (
     <Suspense>
-      <AppShell>
+      <AppShell module="thau" filters={<BidFilters />}>
         <Detail />
       </AppShell>
     </Suspense>
@@ -221,18 +223,5 @@ function Detail() {
         </div>
       )}
     </div>
-  );
-}
-
-function PageLink({ href, label, children }: { href: string | null; label: string; children: React.ReactNode }) {
-  const cls = "grid h-7 w-7 place-items-center rounded-md border border-slate-200";
-  return href ? (
-    <Link href={href} aria-label={label} className={`${cls} text-slate-600 hover:bg-slate-50`}>
-      {children}
-    </Link>
-  ) : (
-    <span aria-hidden className={`${cls} text-slate-300`}>
-      {children}
-    </span>
   );
 }
