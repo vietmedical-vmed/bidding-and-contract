@@ -1,5 +1,5 @@
 // Supabase Edge Function: contract-api
-// Verify HMAC token (do contract-login phát) rồi dispatch theo `action`.
+// Verify HMAC token (do bidding-login hoặc app khác cùng TOKEN_SECRET phát) rồi dispatch theo `action`.
 // Payload chuẩn: { action, token, payload }
 //
 // Deploy:

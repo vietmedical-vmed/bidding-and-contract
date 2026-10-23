@@ -10,3 +10,6 @@ supabase/.temp/
 supabase/.branches/
 supabase/test-users.local.txt
 logs/
+node_modules/
+supabase/contract/seed_data.sql
+~$*.xlsx

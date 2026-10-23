@@ -1,14 +1,14 @@
 """
 Seed script: parse "Bảng kê Hợp đồng.xlsx" -> generate seed_data.sql
-Run: python supabase/seed.py
-Then: supabase db query --linked -f supabase/seed_data.sql
+Run: python supabase/contract/seed.py
+Then: supabase db query --linked -f supabase/contract/seed_data.sql
 """
 
 import openpyxl
 import os
 from datetime import datetime, date
 
-EXCEL_PATH = os.path.join(os.path.dirname(__file__), '..', 'Bảng kê Hợp đồng.xlsx')
+EXCEL_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'Bảng kê Hợp đồng.xlsx')
 OUTPUT_PATH = os.path.join(os.path.dirname(__file__), 'seed_data.sql')
 BATCH_SIZE = 500
 
@@ -137,7 +137,7 @@ def main():
 
     file_size = os.path.getsize(OUTPUT_PATH) / 1024
     print(f'Generated: {OUTPUT_PATH} ({file_size:.0f} KB)')
-    print(f'Run: supabase db query --linked -f supabase/seed_data.sql')
+    print(f'Run: supabase db query --linked -f supabase/contract/seed_data.sql')
 
 
 if __name__ == '__main__':
