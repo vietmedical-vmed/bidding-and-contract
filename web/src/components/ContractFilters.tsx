@@ -7,10 +7,10 @@ import { FilterSelect } from "@/components/FilterSelect";
 import { Modal } from "@/components/Modal";
 import { RefreshCw, Settings } from "@/components/icons";
 import { api, errorMessage } from "@/lib/api";
-import { parseContractFilters, type ContractList } from "@/lib/contracts";
+import { MIEN_OPTIONS, parseContractFilters, type ContractList } from "@/lib/contracts";
 import { useApi } from "@/lib/useApi";
 
-/** Filter row of the contract pages: BU and nhóm SP (one each), plus the admin tools. */
+/** Filter row of the contract pages: BU, nhóm SP and miền (one each), plus the admin tools. */
 export function ContractFilters() {
   const router = useRouter();
   const pathname = usePathname();
@@ -48,10 +48,16 @@ export function ContractFilters() {
             selected={f.nhom_sp ? [f.nhom_sp] : []}
             onChange={(v) => setFilters({ nhom: v[0] })}
           />
-          {(f.bu || f.nhom_sp) && (
+          <FilterSelect
+            label="Miền"
+            options={MIEN_OPTIONS}
+            selected={f.mien ? [f.mien] : []}
+            onChange={(v) => setFilters({ mien: v[0] })}
+          />
+          {(f.bu || f.nhom_sp || f.mien) && (
             <button
               type="button"
-              onClick={() => setFilters({ bu: undefined, nhom: undefined })}
+              onClick={() => setFilters({ bu: undefined, nhom: undefined, mien: undefined })}
               className="px-1 text-[13px] text-blue-600 hover:underline"
             >
               Bỏ lọc

@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Fragment, Suspense, useState } from "react";
 import { AppShell, LoadingBlock, RefreshingBar } from "@/components/AppShell";
 import { ContractFilters } from "@/components/ContractFilters";
-import { DaysBadge, KpiCards, MienTabs, UsageBar } from "@/components/contractUi";
+import { Badge, DaysBadge, StatusTabs, UsageBar } from "@/components/contractUi";
 import { ChevronLeft, ChevronRight, Download } from "@/components/icons";
 import { PageLink } from "@/components/PageLink";
 import { SearchBox } from "@/components/SearchBox";
@@ -26,7 +26,7 @@ import {
 import { useApi } from "@/lib/useApi";
 
 const PAGE_SIZE = 15;
-const COLUMNS = 11;
+const COLUMNS = 8;
 
 export default function ContractListPage() {
   return (
@@ -46,10 +46,7 @@ function ContractListView() {
   const q = params.get("q") ?? "";
   const page = Math.max(1, Number(params.get("page")) || 1);
 
-  const bac = useApi<Summary>("dashboard-summary", { bu: f.bu, nhom_sp: f.nhom_sp, mien: "Miền Bắc" }, "contract");
-  const nam = useApi<Summary>("dashboard-summary", { bu: f.bu, nhom_sp: f.nhom_sp, mien: "Miền Nam" }, "contract");
-  const kpi = (f.mien === "Miền Nam" ? nam : bac).data;
-
+  const summary = useApi<Summary>("dashboard-summary", { ...f }, "contract");
   const query = { ...f, status, search: q, page, page_size: PAGE_SIZE };
   const list = useApi<ContractList>("list-contracts", query, "contract");
   const d = list.data;
@@ -67,76 +64,54 @@ function ContractListView() {
   };
 
   return (
-    <div className="space-y-4">
-      {kpi && (
-        <KpiCards
-          summary={kpi}
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchBox placeholder="Tìm số HĐ, mã HĐ, khách hàng…" />
+        <StatusTabs
           active={status}
-          hrefFor={(key) => withParams({ status: key === "all" || key === status ? undefined : key })}
+          summary={summary.data}
+          hrefFor={(key) => withParams({ status: key === "all" ? undefined : key })}
         />
-      )}
+        <span className="ml-auto text-[13px] text-slate-500">{d ? `${fmtInt(d.total ?? 0)} hợp đồng` : ""}</span>
+        <ExportButton payload={{ mien: f.mien, bu: f.bu, nhom_sp: f.nhom_sp, status }} />
+      </div>
 
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-2">
-          <MienTabs
-            active={f.mien}
-            counts={{ "Miền Bắc": bac.data?.total_contracts, "Miền Nam": nam.data?.total_contracts }}
-            hrefFor={(m) => withParams({ mien: m })}
-          />
-          <div className="flex-1" />
-          <div className="flex items-center gap-2 py-1.5 pr-2">
-            <span className="text-[13px] text-slate-500">{d ? `${fmtInt(d.total ?? 0)} hợp đồng` : ""}</span>
-            <SearchBox placeholder="Tìm số HĐ, mã HĐ, khách hàng…" />
-            <ExportButton payload={{ mien: f.mien, bu: f.bu, nhom_sp: f.nhom_sp, status }} />
+      {list.loading && d && <RefreshingBar />}
+      {!d || list.error ? (
+        <LoadingBlock error={list.error} />
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="scroll-shadow overflow-x-auto">
+            <table className="w-full min-w-[1100px] border-collapse text-[13px]">
+              <thead>
+                <tr className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+                  <th className="w-8" />
+                  <th className="px-3 py-2 text-left font-semibold">Hợp đồng</th>
+                  <th className="px-3 py-2 text-left font-semibold">Khách hàng</th>
+                  <th className="px-3 py-2 text-left font-semibold">Miền</th>
+                  <th className="px-3 py-2 text-left font-semibold">Ngày ký</th>
+                  <th className="px-3 py-2 text-left font-semibold">Thời hạn</th>
+                  <th className="px-3 py-2 text-left font-semibold">Còn lại</th>
+                  <th className="px-3 py-2 text-left font-semibold">PS / SO</th>
+                </tr>
+              </thead>
+              {/* Re-keyed on every new result so expanded rows close with the page they belong to. */}
+              <ContractRows key={JSON.stringify(query)} rows={d.data ?? []} />
+            </table>
           </div>
+          <nav className="flex items-center justify-end gap-2 border-t border-slate-100 px-4 py-2 text-[13px]" aria-label="Phân trang">
+            <span className="mr-1 text-slate-500">
+              Trang {page} / {pages}
+            </span>
+            <PageLink href={page > 1 ? withParams({ page: String(page - 1) }) : null} label="Trang trước">
+              <ChevronLeft size={14} />
+            </PageLink>
+            <PageLink href={page < pages ? withParams({ page: String(page + 1) }) : null} label="Trang sau">
+              <ChevronRight size={14} />
+            </PageLink>
+          </nav>
         </div>
-
-        {list.loading && d && (
-          <div className="px-3 pt-3">
-            <RefreshingBar />
-          </div>
-        )}
-        {!d || list.error ? (
-          <div className="p-4">
-            <LoadingBlock error={list.error} />
-          </div>
-        ) : (
-          <>
-            <div className="scroll-shadow overflow-x-auto">
-              <table className="w-full min-w-[1100px] border-collapse text-[13px]">
-                <thead>
-                  <tr className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
-                    <th className="w-8" />
-                    <th className="px-3 py-2 text-left font-semibold">Mã HĐ</th>
-                    <th className="px-3 py-2 text-left font-semibold">Số HĐ</th>
-                    <th className="px-3 py-2 text-left font-semibold">Mã KH</th>
-                    <th className="px-3 py-2 text-left font-semibold">Khách hàng</th>
-                    <th className="px-3 py-2 text-center font-semibold">Loại</th>
-                    <th className="px-3 py-2 text-center font-semibold">Ngày ký</th>
-                    <th className="px-3 py-2 text-center font-semibold">Thời hạn</th>
-                    <th className="px-3 py-2 text-center font-semibold">Còn lại</th>
-                    <th className="px-3 py-2 text-left font-semibold">PS</th>
-                    <th className="px-3 py-2 text-left font-semibold">SO</th>
-                  </tr>
-                </thead>
-                {/* Re-keyed on every new result so expanded rows close with the page they belong to. */}
-                <ContractRows key={JSON.stringify(query)} rows={d.data ?? []} />
-              </table>
-            </div>
-            <nav className="flex items-center justify-end gap-2 border-t border-slate-100 px-4 py-2 text-[13px]" aria-label="Phân trang">
-              <span className="mr-1 text-slate-500">
-                Trang {page} / {pages}
-              </span>
-              <PageLink href={page > 1 ? withParams({ page: String(page - 1) }) : null} label="Trang trước">
-                <ChevronLeft size={14} />
-              </PageLink>
-              <PageLink href={page < pages ? withParams({ page: String(page + 1) }) : null} label="Trang sau">
-                <ChevronRight size={14} />
-              </PageLink>
-            </nav>
-          </>
-        )}
-      </section>
+      )}
     </div>
   );
 }
@@ -163,41 +138,40 @@ function ContractRows({ rows }: { rows: Contract[] }) {
   }
   return (
     <tbody>
-      {rows.map((c) => {
+      {rows.map((c, i) => {
         const isOpen = open.has(c.ma_hd);
         return (
           <Fragment key={c.ma_hd}>
             <tr
               onClick={() => toggle(c.ma_hd)}
-              className={`cursor-pointer border-b border-slate-100 ${isOpen ? "bg-blue-50/60" : "hover:bg-blue-50/40"}`}
+              className={`cursor-pointer align-top ${isOpen ? "bg-blue-50/60" : `${i % 2 ? "bg-slate-50/50" : "bg-white"} hover:bg-blue-50/40`}`}
             >
               <td className="py-2 pl-2 text-slate-400">
-                <ChevronRight size={14} className={`transition-transform ${isOpen ? "rotate-90" : ""}`} />
+                <ChevronRight size={14} className={`mt-0.5 transition-transform ${isOpen ? "rotate-90" : ""}`} />
               </td>
-              <td className="whitespace-nowrap px-3 py-2 font-semibold text-blue-600">{c.ma_hd}</td>
-              <td className="whitespace-nowrap px-3 py-2">{c.so_hd || "—"}</td>
-              <td className="whitespace-nowrap px-3 py-2">{c.ma_kh || "—"}</td>
-              <td className="max-w-[250px] truncate px-3 py-2" title={c.ten_kh ?? ""}>
-                {c.ten_kh || "—"}
+              <td className="whitespace-nowrap px-3 py-2">
+                <div className="font-medium text-slate-800">{c.so_hd || "—"}</div>
+                <div className="text-[11px] text-slate-400">{c.ma_hd}</div>
               </td>
-              <td className="whitespace-nowrap px-3 py-2 text-center">
-                {c.loai_bv ? (
-                  <span
-                    className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${c.loai_bv === "Công" ? "bg-blue-100 text-blue-800" : "bg-pink-100 text-pink-800"}`}
-                  >
-                    {c.loai_bv}
-                  </span>
-                ) : (
-                  "—"
-                )}
+              <td className="max-w-72 px-3 py-2">
+                <div className="line-clamp-1 text-slate-800" title={c.ten_kh ?? ""}>
+                  {c.ten_kh || "—"}
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                  {c.ma_kh}
+                  {c.loai_bv && <Badge tone={c.loai_bv === "Công" ? "blue" : "grey"}>{c.loai_bv}</Badge>}
+                </div>
               </td>
-              <td className="whitespace-nowrap px-3 py-2 text-center tabular-nums">{fmtDate(c.ngay_ky)}</td>
-              <td className="whitespace-nowrap px-3 py-2 text-center tabular-nums">{fmtDate(c.thoi_han)}</td>
-              <td className="whitespace-nowrap px-3 py-2 text-center">
+              <td className="whitespace-nowrap px-3 py-2 text-slate-600">{c.mien || "—"}</td>
+              <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600">{fmtDate(c.ngay_ky)}</td>
+              <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600">{fmtDate(c.thoi_han)}</td>
+              <td className="whitespace-nowrap px-3 py-2">
                 <DaysBadge days={c.days_remaining} />
               </td>
-              <td className="whitespace-nowrap px-3 py-2">{c.ten_ps || "—"}</td>
-              <td className="whitespace-nowrap px-3 py-2">{c.ten_so || "—"}</td>
+              <td className="whitespace-nowrap px-3 py-2">
+                <div className="text-slate-800">{c.ten_ps || "—"}</div>
+                <div className="text-[11px] text-slate-400">{c.ten_so}</div>
+              </td>
             </tr>
             {isOpen && <ContractItems maHd={c.ma_hd} />}
           </Fragment>
@@ -217,69 +191,67 @@ function ContractItems({ maHd }: { maHd: string }) {
     (a, b) => (usedPct(b) ?? 0) - (usedPct(a) ?? 0) || (a.ma_ncc ?? "").localeCompare(b.ma_ncc ?? ""),
   );
 
+  const num = "px-2 py-1.5 text-right tabular-nums";
   return (
     <tr>
-      <td colSpan={COLUMNS} className="p-0">
-        <div className="border-b-2 border-slate-200 bg-slate-50/70 py-2 pl-8 pr-3">
-          {!d ? (
-            <div className={`py-4 text-center text-[12px] ${detail.error ? "text-red-600" : "text-slate-400"}`}>
-              {detail.error ? `Lỗi: ${detail.error}` : "Đang tải sản phẩm…"}
-            </div>
-          ) : items.length === 0 ? (
-            <div className="py-4 text-center text-[12px] text-slate-400">Không có sản phẩm</div>
-          ) : (
-            <>
-              <table className="w-full text-[12px]">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-500">
-                    <th className="px-2 py-1.5 text-center font-medium">#</th>
-                    <th className="px-2 py-1.5 text-left font-medium">Mã chung</th>
-                    <th className="px-2 py-1.5 text-left font-medium">Mã NCC</th>
-                    <th className="px-2 py-1.5 text-left font-medium">Tên hàng hóa</th>
-                    <th className="px-2 py-1.5 text-center font-medium">Đơn giá</th>
-                    <th className="px-2 py-1.5 text-center font-medium">SL thầu</th>
-                    {fyList.map((fy) => (
-                      <th key={fy.fy} className="whitespace-nowrap px-2 py-1.5 text-center font-medium text-blue-600">
-                        SL bán {fy.label}
-                      </th>
-                    ))}
-                    <th className="px-2 py-1.5 text-center font-medium">SL bán</th>
-                    <th className="px-2 py-1.5 text-center font-medium">Còn lại</th>
-                    <th className="px-2 py-1.5 text-left font-medium">Tiến độ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((it, i) => (
-                    <tr key={it.id ?? i} className="border-b border-slate-100 last:border-0">
-                      <td className="px-2 py-1.5 text-center text-slate-400">{i + 1}</td>
-                      <td className="whitespace-nowrap px-2 py-1.5 font-medium">{it.ma_chung || "—"}</td>
-                      <td className="whitespace-nowrap px-2 py-1.5">{it.ma_ncc || "—"}</td>
-                      <td className="max-w-[220px] truncate px-2 py-1.5" title={it.ten_hang_hoa ?? ""}>
-                        {it.ten_hang_hoa || "—"}
-                      </td>
-                      <td className="whitespace-nowrap px-2 py-1.5 text-center tabular-nums">{fmtMoney(it.don_gia)}</td>
-                      <td className="px-2 py-1.5 text-center tabular-nums">{fmtInt(it.so_luong_hd ?? 0)}</td>
-                      {fyList.map((fy) => {
-                        const v = it.fy_sold?.[`fy${fy.fy % 100}`] ?? 0;
-                        return (
-                          <td key={fy.fy} className={`px-2 py-1.5 text-center tabular-nums ${v > 0 ? "text-blue-600" : "text-slate-400"}`}>
-                            {fmtInt(v)}
-                          </td>
-                        );
-                      })}
-                      <td className="px-2 py-1.5 text-center tabular-nums">{fmtInt(it.so_luong_da_ban ?? 0)}</td>
-                      <td className="px-2 py-1.5 text-center font-medium tabular-nums">
-                        {it.is_bv_tu ? "—" : fmtInt(it.so_luong_con_lai ?? 0)}
-                      </td>
-                      <td className="px-2 py-1.5">{it.is_bv_tu ? <span className="text-slate-400">—</span> : <UsageBar item={it} />}</td>
-                    </tr>
+      <td colSpan={COLUMNS} className="border-b border-slate-200 bg-slate-50 px-3 py-2.5 pl-9">
+        {!d ? (
+          <div className={`py-4 text-center text-[12px] ${detail.error ? "text-red-600" : "text-slate-400"}`}>
+            {detail.error ? `Lỗi: ${detail.error}` : "Đang tải sản phẩm…"}
+          </div>
+        ) : items.length === 0 ? (
+          <div className="py-4 text-center text-[12px] text-slate-400">Không có sản phẩm</div>
+        ) : (
+          <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
+            <table className="w-full border-collapse text-[12px]">
+              <thead>
+                <tr className="border-b border-slate-100 text-[10px] uppercase tracking-wide text-slate-500">
+                  <th className="px-2 py-1.5 text-right font-semibold">#</th>
+                  <th className="px-2 py-1.5 text-left font-semibold">Sản phẩm</th>
+                  <th className="px-2 py-1.5 text-right font-semibold">Đơn giá</th>
+                  <th className="px-2 py-1.5 text-right font-semibold">SL thầu</th>
+                  {fyList.map((fy) => (
+                    <th key={fy.fy} className="whitespace-nowrap px-2 py-1.5 text-right font-semibold">
+                      Bán {fy.label}
+                    </th>
                   ))}
-                </tbody>
-              </table>
-              <div className="mt-1 text-[11px] text-slate-400">{items.length} sản phẩm</div>
-            </>
-          )}
-        </div>
+                  <th className="px-2 py-1.5 text-right font-semibold">Đã bán</th>
+                  <th className="px-2 py-1.5 text-right font-semibold">Còn lại</th>
+                  <th className="px-2 py-1.5 pr-3 text-left font-semibold">Tiến độ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((it, i) => (
+                  <tr key={it.id ?? i} className={`align-top ${i % 2 ? "bg-slate-50/50" : "bg-white"}`}>
+                    <td className="px-2 py-1.5 text-right tabular-nums text-slate-400">{i + 1}</td>
+                    <td className="max-w-80 px-2 py-1.5">
+                      <div className="line-clamp-1 text-slate-800" title={it.ten_hang_hoa ?? ""}>
+                        {it.ten_hang_hoa || "—"}
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        {it.ma_chung || "—"} · {it.ma_ncc || "—"}
+                      </div>
+                    </td>
+                    <td className={`${num} whitespace-nowrap text-slate-600`}>{fmtMoney(it.don_gia)}</td>
+                    <td className={`${num} text-slate-700`}>{fmtInt(it.so_luong_hd ?? 0)}</td>
+                    {fyList.map((fy) => {
+                      const v = it.fy_sold?.[`fy${fy.fy % 100}`] ?? 0;
+                      return (
+                        <td key={fy.fy} className={`${num} ${v > 0 ? "text-slate-700" : "text-slate-300"}`}>
+                          {fmtInt(v)}
+                        </td>
+                      );
+                    })}
+                    <td className={`${num} text-slate-700`}>{fmtInt(it.so_luong_da_ban ?? 0)}</td>
+                    <td className={`${num} font-semibold text-slate-800`}>{it.is_bv_tu ? "—" : fmtInt(it.so_luong_con_lai ?? 0)}</td>
+                    <td className="px-2 py-1.5 pr-3">{it.is_bv_tu ? <span className="text-slate-400">—</span> : <UsageBar item={it} />}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="border-t border-slate-100 px-3 py-1.5 text-[11px] text-slate-400">{items.length} sản phẩm</div>
+          </div>
+        )}
       </td>
     </tr>
   );
@@ -306,7 +278,7 @@ function ExportButton({ payload }: { payload: Record<string, string> }) {
       type="button"
       onClick={run}
       disabled={busy}
-      className="flex items-center gap-1.5 whitespace-nowrap rounded-md bg-green-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+      className="flex items-center gap-1.5 whitespace-nowrap rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
     >
       <Download size={14} />
       {busy ? "Đang xuất…" : "Xuất Excel"}

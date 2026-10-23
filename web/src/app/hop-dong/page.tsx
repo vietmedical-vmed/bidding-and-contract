@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingBlock, RefreshingBar } from "@/components/AppShell";
+import { Panel } from "@/components/charts";
 import { ContractFilters } from "@/components/ContractFilters";
-import { KpiCards, MienTabs } from "@/components/contractUi";
+import { Badge, ContractTotalCard, StatusCards, UsageBar } from "@/components/contractUi";
 import { fmtInt } from "@/lib/bids";
 import { fmtDate, parseContractFilters, usedPct, type Contract, type ContractItem, type Summary } from "@/lib/contracts";
 import { useApi } from "@/lib/useApi";
@@ -22,150 +24,141 @@ export default function ContractDashboardPage() {
 function ContractDashboard() {
   const params = useSearchParams();
   const f = parseContractFilters(params);
-  const bac = useApi<Summary>("dashboard-summary", { bu: f.bu, nhom_sp: f.nhom_sp, mien: "Miền Bắc" }, "contract");
-  const nam = useApi<Summary>("dashboard-summary", { bu: f.bu, nhom_sp: f.nhom_sp, mien: "Miền Nam" }, "contract");
-  const cur = f.mien === "Miền Nam" ? nam : bac;
-  const d = cur.data;
+  const summary = useApi<Summary>("dashboard-summary", { ...f }, "contract");
+  const d = summary.data;
 
-  if (!d) return <LoadingBlock error={cur.error} />;
+  if (!d) return <LoadingBlock error={summary.error} />;
 
-  const withParams = (path: string, changes: Record<string, string | undefined>) => {
+  /** Contract list with the current filters plus the given params. */
+  const listHref = (extra: Record<string, string>) => {
     const next = new URLSearchParams(params);
-    for (const [k, v] of Object.entries(changes)) {
-      if (v) next.set(k, v);
-      else next.delete(k);
-    }
-    return `${path}?${next.toString()}`;
+    for (const [k, v] of Object.entries(extra)) next.set(k, v);
+    return `/hop-dong/danh-sach/?${next.toString()}`;
   };
+  const quantity = [...(d.quantity_alerts ?? [])].sort((a, b) => (usedPct(b) ?? 0) - (usedPct(a) ?? 0));
 
   return (
     <div className="space-y-4">
-      {cur.loading && <RefreshingBar />}
-      {cur.error && <LoadingBlock error={cur.error} />}
+      {summary.loading && <RefreshingBar />}
+      {summary.error && <LoadingBlock error={summary.error} />}
 
-      {d.last_invoice_date && (
-        <div className="text-[12px] text-slate-400">
-          Dữ liệu bán hàng cập nhật đến: <span className="font-bold text-slate-800">{fmtDate(d.last_invoice_date)}</span>
-        </div>
-      )}
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,3fr)]">
+        <ContractTotalCard summary={d} />
+        <StatusCards summary={d} hrefFor={(status) => listHref({ status })} />
+      </div>
 
-      <KpiCards
-        summary={d}
-        hrefFor={(key) => withParams("/hop-dong/danh-sach/", { status: key === "all" ? undefined : key })}
-      />
-
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-2">
-          <MienTabs
-            active={f.mien}
-            counts={{ "Miền Bắc": bac.data?.total_contracts, "Miền Nam": nam.data?.total_contracts }}
-            hrefFor={(m) => withParams("", { mien: m })}
-          />
-        </div>
-        <div className="grid gap-6 p-4 lg:grid-cols-2">
-          <ExpiryTable title={`HĐ sắp hết hạn (${d.max_warn_days || 30} ngày)`} rows={d.expiry_alerts ?? []} />
-          <QuantityTable title={`SP đã sử dụng >${d.quantity_warn_pct ?? 80}% thầu`} rows={d.quantity_alerts ?? []} />
-        </div>
-      </section>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Panel
+          title="Hợp đồng sắp hết hạn"
+          subtitle={`Hết hạn trong ${d.max_warn_days || 30} ngày tới, ${fmtInt(d.expiry_alerts?.length ?? 0)} hợp đồng gần nhất`}
+        >
+          <ExpiryTable rows={d.expiry_alerts ?? []} hrefFor={(c) => listHref({ q: c.so_hd || c.ma_hd })} />
+        </Panel>
+        <Panel
+          title="Sản phẩm sắp hết số lượng thầu"
+          subtitle={`Đã bán trên ${d.quantity_warn_pct ?? 80}% số lượng hợp đồng (HĐ bệnh viện công còn hạn)`}
+        >
+          <QuantityTable rows={quantity} />
+        </Panel>
+      </div>
     </div>
   );
 }
 
-function SectionTitle({ title, dot }: { title: string; dot: string }) {
-  return (
-    <h3 className="mb-3 flex items-center gap-2 text-[13px] font-semibold text-slate-800">
-      <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
-      {title}
-    </h3>
-  );
-}
+const th = "px-2 py-2 font-semibold";
 
-function ExpiryTable({ title, rows }: { title: string; rows: Contract[] }) {
+function ExpiryTable({ rows, hrefFor }: { rows: Contract[]; hrefFor: (c: Contract) => string }) {
   return (
-    <div>
-      <SectionTitle title={title} dot="bg-amber-500" />
-      {rows.length === 0 ? (
-        <p className="text-[13px] text-slate-500">Không có hợp đồng nào sắp hết hạn</p>
-      ) : (
-        <table className="w-full border-collapse text-[12px]">
-          <thead>
-            <tr className="border-b border-slate-200 text-slate-400">
-              <th className="px-2 py-2 text-left font-medium">Số HĐ</th>
-              <th className="px-2 py-2 text-left font-medium">Khách hàng</th>
-              <th className="whitespace-nowrap px-2 py-2 text-right font-medium">Còn lại</th>
+    <div className="scroll-shadow overflow-x-auto">
+      <table className="w-full border-collapse text-[13px]">
+        <thead>
+          <tr className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+            <th className={`${th} pl-4 text-left`}>Số HĐ</th>
+            <th className={`${th} text-left`}>Khách hàng</th>
+            <th className={`${th} text-left`}>Thời hạn</th>
+            <th className={`${th} pr-4 text-right`}>Còn lại</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((c, i) => {
+            const days = c.days_remaining ?? 0;
+            return (
+              <tr key={c.ma_hd} className={`${i % 2 ? "bg-slate-50/50" : "bg-white"} hover:bg-blue-50/40`}>
+                <td className="max-w-[200px] truncate whitespace-nowrap py-1.5 pl-4 pr-2" title={c.so_hd ?? c.ma_hd}>
+                  <Link href={hrefFor(c)} className="text-slate-800 hover:text-blue-600 hover:underline">
+                    {c.so_hd || c.ma_hd}
+                  </Link>
+                </td>
+                <td className="max-w-[220px] truncate px-2 py-1.5 text-slate-600" title={c.ten_kh ?? ""}>
+                  {c.ten_kh}
+                </td>
+                <td className="whitespace-nowrap px-2 py-1.5 tabular-nums text-slate-600">{fmtDate(c.thoi_han)}</td>
+                <td className="py-1.5 pl-2 pr-4 text-right">
+                  <Badge tone={days <= 7 ? "red" : days <= 15 ? "amber" : "grey"}>{days} ngày</Badge>
+                </td>
+              </tr>
+            );
+          })}
+          {rows.length === 0 && (
+            <tr>
+              <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
+                Không có hợp đồng nào sắp hết hạn
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {rows.map((a) => {
-              const days = a.days_remaining ?? 0;
-              return (
-                <tr key={a.ma_hd} className="border-b border-slate-100">
-                  <td className="max-w-[180px] truncate whitespace-nowrap px-2 py-2 font-medium text-slate-800">{a.so_hd || a.ma_hd}</td>
-                  <td className="max-w-[160px] truncate whitespace-nowrap px-2 py-2 text-slate-500">{a.ten_kh}</td>
-                  <td className="whitespace-nowrap px-2 py-2 text-right">
-                    <span
-                      className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium text-white ${days <= 7 ? "bg-red-500" : days <= 15 ? "bg-amber-500" : "bg-gray-500"}`}
-                    >
-                      {days} ngày
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }
 
-function QuantityTable({ title, rows }: { title: string; rows: ContractItem[] }) {
-  // One block per contract, its items listed underneath.
-  const groups = new Map<string, { so_hd: string | null; ten_kh: string | null; items: ContractItem[] }>();
-  for (const it of rows) {
-    const g = groups.get(it.ma_hd) ?? { so_hd: it.so_hd, ten_kh: it.ten_kh, items: [] };
-    g.items.push(it);
-    groups.set(it.ma_hd, g);
-  }
-
+function QuantityTable({ rows }: { rows: ContractItem[] }) {
   return (
-    <div>
-      <SectionTitle title={title} dot="bg-red-500" />
-      {rows.length === 0 ? (
-        <p className="text-[13px] text-slate-500">Không có sản phẩm nào vượt ngưỡng</p>
-      ) : (
-        <div className="scroll-shadow max-h-[560px] space-y-3 overflow-y-auto pr-1">
-          {[...groups].map(([maHd, g]) => (
-            <div key={maHd} className="border-b border-slate-200 pb-3 last:border-0 last:pb-0">
-              <div className="mb-2 flex items-center gap-2 text-[12px]">
-                <span className="font-medium text-blue-600">{g.so_hd || maHd}</span>
-                {g.ten_kh && <span className="text-slate-400">· {g.ten_kh}</span>}
-              </div>
-              <div className="space-y-1 border-l-2 border-slate-200 pl-3">
-                {g.items.map((it) => {
-                  const pct = usedPct(it) ?? 0;
-                  return (
-                    <div key={it.id} className="flex items-center gap-2 py-1 text-[12px]">
-                      <span className="w-20 shrink-0 truncate text-slate-500">{it.ma_ncc || "—"}</span>
-                      <span className="min-w-0 flex-1 truncate text-slate-800" title={it.ten_hang_hoa ?? ""}>
-                        {it.ten_hang_hoa}
-                      </span>
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium text-white ${pct >= 90 ? "bg-red-500" : "bg-amber-500"}`}
-                      >
-                        {pct}%
-                      </span>
-                      <span className="min-w-[70px] shrink-0 text-right tabular-nums text-slate-400">
-                        {fmtInt(it.so_luong_con_lai ?? 0)}/{fmtInt(it.so_luong_hd ?? 0)}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+    <div className="scroll-shadow max-h-[480px] overflow-auto">
+      <table className="w-full min-w-[620px] border-collapse text-[13px]">
+        <thead className="sticky top-0">
+          <tr className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+            <th className={`${th} pl-4 text-left`}>Hợp đồng</th>
+            <th className={`${th} text-left`}>Sản phẩm</th>
+            <th className={`${th} text-left`}>Đã bán</th>
+            <th className={`${th} pr-4 text-right`}>Còn lại</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((it, i) => (
+            <tr key={it.id} className={`align-top ${i % 2 ? "bg-slate-50/50" : "bg-white"} hover:bg-blue-50/40`}>
+              <td className="max-w-[180px] py-1.5 pl-4 pr-2">
+                <div className="truncate text-slate-800" title={it.so_hd ?? it.ma_hd}>
+                  {it.so_hd || it.ma_hd}
+                </div>
+                <div className="truncate text-[11px] text-slate-400" title={it.ten_kh ?? ""}>
+                  {it.ten_kh}
+                </div>
+              </td>
+              <td className="max-w-[240px] px-2 py-1.5">
+                <div className="line-clamp-1 text-slate-800" title={it.ten_hang_hoa ?? ""}>
+                  {it.ten_hang_hoa}
+                </div>
+                <div className="text-[11px] text-slate-400">{it.ma_ncc}</div>
+              </td>
+              <td className="px-2 py-1.5">
+                <UsageBar item={it} />
+              </td>
+              <td className="whitespace-nowrap py-1.5 pl-2 pr-4 text-right tabular-nums text-slate-600">
+                {fmtInt(it.so_luong_con_lai ?? 0)}
+                <span className="text-slate-400"> / {fmtInt(it.so_luong_hd ?? 0)}</span>
+              </td>
+            </tr>
           ))}
-        </div>
-      )}
+          {rows.length === 0 && (
+            <tr>
+              <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
+                Không có sản phẩm nào vượt ngưỡng
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }

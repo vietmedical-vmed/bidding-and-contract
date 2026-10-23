@@ -50,27 +50,30 @@ export type ContractList = { data: Contract[]; total: number; bu_list: string[];
 
 export type ContractDetail = { contract: Contract; items: ContractItem[]; fy_list: { fy: number; label: string }[] };
 
-/** contract-api only has these two regions; the tabs always show both. */
-export const MIEN_TABS = ["Miền Bắc", "Miền Nam"] as const;
+/** The regions contract_contracts uses. */
+export const MIEN_OPTIONS = ["Miền Bắc", "Miền Nam"];
 
-/** Contract status inside the current fiscal year (April → March), as contract-api counts it. */
+/**
+ * Contract status inside the current fiscal year (April → March), as contract-api counts it.
+ * The four statuses split "all"; swatches follow the bidding palette (blue = active, grey = over).
+ */
 export const STATUSES = [
-  { key: "all", label: "Tổng hợp đồng", count: "total_contracts", color: "blue", sub: (fy: string) => `Năm tài chính ${fy}` },
-  { key: "con_han", label: "Còn hạn", count: "con_han_count", color: "green", sub: () => "Không hết hạn trong năm" },
-  { key: "sap_het", label: "Sắp hết hạn", count: "sap_het_han_count", color: "amber", sub: () => "Hết hạn trong năm, chưa hết" },
-  { key: "het_han", label: "Hết hạn", count: "het_han_count", color: "gray", sub: () => "Đã hết hạn trong năm" },
-  { key: "ky_moi", label: "Ký mới", count: "ky_moi_count", color: "violet", sub: () => "Ký mới trong năm" },
+  { key: "all", label: "Tất cả", count: "total_contracts", swatch: "", sub: "" },
+  { key: "con_han", label: "Còn hạn", count: "con_han_count", swatch: "bg-won", sub: "Không hết hạn trong năm" },
+  { key: "ky_moi", label: "Ký mới", count: "ky_moi_count", swatch: "bg-blue-300", sub: "Ký mới trong năm" },
+  { key: "sap_het", label: "Sắp hết hạn", count: "sap_het_han_count", swatch: "bg-amber-500", sub: "Hết hạn trong năm, chưa hết" },
+  { key: "het_han", label: "Hết hạn", count: "het_han_count", swatch: "bg-pending", sub: "Đã hết hạn trong năm" },
 ] as const;
 
 export type StatusKey = (typeof STATUSES)[number]["key"];
 
-/** BU, nhóm SP and miền tab come from the URL; the API reads "" as no filter. */
+/** BU, nhóm SP and miền come from the URL (header filter row); the API reads "" as no filter. */
 export function parseContractFilters(sp: URLSearchParams) {
-  const mien = sp.get("mien");
+  const mien = sp.get("mien") ?? "";
   return {
     bu: sp.get("bu") ?? "",
     nhom_sp: sp.get("nhom") ?? "",
-    mien: MIEN_TABS.find((m) => m === mien) ?? MIEN_TABS[0],
+    mien: MIEN_OPTIONS.includes(mien) ? mien : "",
   };
 }
 
