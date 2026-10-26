@@ -39,6 +39,10 @@ def is_item_row(record: dict) -> bool:
     # Package rows have no item name; lot rows have a name but no model, quantity or result.
     if "danh_muc_hang" not in record:
         return False
+    # Lot rows carry the lot's planned price but no unit price; some also have the
+    # tender's column titles ("Kỹ mã hiệu"...) pasted into the model column.
+    if "gia_ke_hoach" in record and "don_gia" not in record:
+        return False
     return any(k in record for k in ("model", "so_luong", "ket_qua_thau", "gia_trung_thau"))
 
 
