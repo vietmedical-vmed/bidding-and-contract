@@ -399,12 +399,54 @@ async function handleAction(
         return "";
       };
 
+      // Sold quantity per fiscal year, keyed so_hd → ma_chung → fy (same numbers as contract-detail).
+      const soHdList = [...new Set(contracts.map((c: any) => c.so_hd).filter(Boolean))] as string[];
+      const fySold: Record<string, Record<string, Record<number, number>>> = {};
+      const PAGE = 1000; // PostgREST max_rows
+      for (let i = 0; i < soHdList.length; i += 200) {
+        const batch = soHdList.slice(i, i + 200);
+        for (let from = 0; ; from += PAGE) {
+          const { data, error } = await admin
+            .rpc("fn_sold_by_fy_multi", { p_so_hd: batch })
+            .range(from, from + PAGE - 1);
+          if (error) return { ok: false, error: error.message };
+          for (const r of (data || []) as any[]) {
+            ((fySold[r.so_hd] ??= {})[r.ma_chung] ??= {})[r.fy] = Number(r.sold) || 0;
+          }
+          if (!data || data.length < PAGE) break;
+        }
+      }
+
+      // A contract shows the fiscal years from its signing to its expiry, as on the web page;
+      // the export has one column per fiscal year any contract spans, 0 where it does not.
+      const getFy = (d: string | null) => {
+        if (!d) return null;
+        const dt = new Date(d);
+        return dt.getMonth() >= 3 ? dt.getFullYear() : dt.getFullYear() - 1;
+      };
+      const spans: Record<string, [number, number] | null> = {};
+      let fyMin = Infinity, fyMax = -Infinity;
+      for (const c of contracts) {
+        const a = getFy(c.ngay_ky), b = getFy(c.thoi_han);
+        spans[c.ma_hd] = a != null && b != null && a <= b ? [a, b] : null;
+        if (spans[c.ma_hd]) { fyMin = Math.min(fyMin, a!); fyMax = Math.max(fyMax, b!); }
+      }
+      const fyList: number[] = [];
+      for (let y = fyMin; y <= fyMax; y++) fyList.push(y);
+
       const cMap: Record<string, any> = {};
       for (const c of contracts) cMap[c.ma_hd] = c;
 
       const rows = allItems.map((it: any) => {
         const c = cMap[it.ma_hd] || {};
+        const span = spans[it.ma_hd];
+        const sold = (c.so_hd && it.ma_chung && fySold[c.so_hd]?.[it.ma_chung]) || {};
+        const fy_sold: Record<string, number> = {};
+        for (const fy of fyList) {
+          fy_sold["fy" + (fy % 100)] = span && fy >= span[0] && fy <= span[1] ? sold[fy] || 0 : 0;
+        }
         return {
+          fy_sold,
           loai_bv: c.loai_bv || "",
           ten_kh: c.ten_kh,
           so_hd: c.so_hd,
@@ -422,7 +464,7 @@ async function handleAction(
         };
       });
 
-      return { ok: true, rows };
+      return { ok: true, rows, fy_list: fyList.map(y => ({ fy: y, label: "FY" + (y % 100) })) };
     }
 
     // ── get-alerts ───────────────────────────────────────────────────────

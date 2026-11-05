@@ -10,7 +10,7 @@ import { PageLink } from "@/components/PageLink";
 import { SearchBox } from "@/components/SearchBox";
 import { api, errorMessage } from "@/lib/api";
 import { fmtInt } from "@/lib/bids";
-import { downloadContractsXlsx, type ExportRow } from "@/lib/contractExport";
+import { downloadContractsXlsx, type ExportFy, type ExportRow } from "@/lib/contractExport";
 import {
   fmtDate,
   fmtMoney,
@@ -263,9 +263,9 @@ function ExportButton({ payload }: { payload: Record<string, string> }) {
   async function run() {
     setBusy(true);
     try {
-      const res = await api<{ rows: ExportRow[] }>("export-contracts", payload, "contract");
+      const res = await api<{ rows: ExportRow[]; fy_list?: ExportFy[] }>("export-contracts", payload, "contract");
       if (!res.rows?.length) alert("Không có dữ liệu để xuất");
-      else await downloadContractsXlsx(res.rows);
+      else await downloadContractsXlsx(res.rows, res.fy_list ?? []);
     } catch (err) {
       alert(`Lỗi xuất Excel: ${errorMessage(err)}`);
     } finally {
