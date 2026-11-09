@@ -667,23 +667,6 @@ async function handleAction(
       return { ok: true };
     }
 
-    // ── sync-invoices ────────────────────────────────────────────────────
-    // Uses Postgres RPC to join invoices directly in SQL (avoids PostgREST
-    // .in() encoding issues with special chars in so_hd like / and Đ)
-    case "sync-invoices": {
-      if (perm.role !== "admin") return { ok: false, error: "no permission" };
-
-      const { data: cfgRows } = await admin.from("contract_alert_config").select("key, value");
-      const cfg: Record<string, any> = {};
-      for (const r of cfgRows || []) cfg[r.key] = r.value;
-      const avgMonths = cfg.avg_period_months || 3;
-
-      const { data, error } = await admin.rpc("fn_sync_sold_snapshot", { p_avg_months: avgMonths });
-      if (error) return { ok: false, error: "sync failed: " + error.message };
-      const { data: nkCount } = await admin.rpc("fn_refresh_ngoai_khoa");
-      return { ok: true, updated: data, ngoai_khoa_refreshed: nkCount ?? 0 };
-    }
-
     default:
       return { ok: false, error: `unknown action: ${action}` };
   }

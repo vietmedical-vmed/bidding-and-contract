@@ -11,7 +11,7 @@
 
 - `/hop-dong/`: số hợp đồng theo trạng thái trong năm tài chính (T4 → T3), tab Miền Bắc/Nam, HĐ sắp hết hạn và sản phẩm đã dùng quá ngưỡng thầu. Bấm thẻ trạng thái để mở danh sách đã lọc.
 - `/hop-dong/danh-sach/`: danh sách hợp đồng (15 dòng/trang), lọc theo trạng thái, tìm kiếm, bấm dòng để xem sản phẩm và số lượng bán theo từng năm tài chính, nút **Xuất Excel**.
-- Admin có thêm nút **Đồng bộ dữ liệu bán** (`fn_sync_sold_snapshot`, `fn_refresh_ngoai_khoa`) và **Cấu hình cảnh báo** (bảng `contract_alert_config`).
+- Admin có thêm nút **Cấu hình cảnh báo** (bảng `contract_alert_config`).
 
 Bộ lọc của mỗi module nằm trên URL (`?bu=...&nhom=...`), nên có thể gửi link đã lọc.
 

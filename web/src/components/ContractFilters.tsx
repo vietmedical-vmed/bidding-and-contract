@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthGate";
 import { FilterSelect } from "@/components/FilterSelect";
 import { Modal } from "@/components/Modal";
-import { RefreshCw, Settings } from "@/components/icons";
+import { Settings } from "@/components/icons";
 import { api, errorMessage } from "@/lib/api";
 import { MIEN_OPTIONS, parseContractFilters, type ContractList } from "@/lib/contracts";
 import { useApi } from "@/lib/useApi";
@@ -68,53 +68,13 @@ export function ContractFilters() {
         <span className="text-[12px] text-slate-400">{options.error ?? "Đang tải bộ lọc…"}</span>
       )}
       <div className="flex-1" />
-      {user.role === "admin" && (
-        <>
-          <SyncButton />
-          <ConfigButton />
-        </>
-      )}
+      {user.role === "admin" && <ConfigButton />}
     </>
   );
 }
 
 const toolClass =
   "flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60";
-
-/** Recomputes sold quantities from the invoices (fn_sync_sold_snapshot + fn_refresh_ngoai_khoa). */
-function SyncButton() {
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-
-  async function sync() {
-    setBusy(true);
-    setMsg(null);
-    try {
-      const res = await api<{ updated?: number }>("sync-invoices", {}, "contract");
-      setMsg({ ok: true, text: `Đồng bộ xong ${res.updated ?? 0} dòng. Bấm Reload để xem số mới.` });
-    } catch (err) {
-      setMsg({ ok: false, text: errorMessage(err) });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="relative">
-      <button type="button" onClick={sync} disabled={busy} className={toolClass}>
-        <RefreshCw size={13} className={busy ? "animate-spin" : ""} />
-        {busy ? "Đang đồng bộ…" : "Đồng bộ dữ liệu bán"}
-      </button>
-      {msg && (
-        <div
-          className={`absolute right-0 top-full z-10 mt-1 whitespace-nowrap rounded px-2 py-1 text-[12px] shadow-lg ${msg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
-        >
-          {msg.text}
-        </div>
-      )}
-    </div>
-  );
-}
 
 type AlertConfig = { contract_warn_days?: number[]; quantity_warn_pct?: number };
 
