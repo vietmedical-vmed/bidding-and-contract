@@ -110,19 +110,19 @@ Theo dõi hợp đồng trúng thầu ngoại khoa (BU `CH&CS`, `CTTM & CTUT`, `
 
 - `contract_contracts`: thông tin hợp đồng (số HĐ, khách hàng, miền, thời hạn, `is_ngoai_khoa`).
 - `contract_items`: hàng hóa trong hợp đồng (mã chung, tên, số lượng, đơn giá).
-- `contract_sold_snapshot`: số lượng đã bán (join theo `so_hd` + `ma_chung`), cập nhật bằng `fn_sync_sold_snapshot`.
+- `contract_sold_snapshot`: tốc độ bán trung bình 3 tháng (`avg_daily_3m`), cập nhật bằng `fn_sync_sold_snapshot`.
 - `contract_alert_config`: ngưỡng cảnh báo (số ngày trước hạn, % đã dùng).
 - `contract_expiry_view`: số ngày còn lại và nhóm trạng thái của từng hợp đồng.
 - `contract_items_remaining_view`: số lượng còn lại = số lượng HĐ − đã bán (đã bán đọc thẳng từ `app_contract.hoa_don_bovattu`).
 
 ## SQL
 
-[supabase/contract/](supabase/contract/) chứa `schema.sql` và `migration_001` → `migration_016`. Các file này đã chạy trên production bằng tay, theo thứ tự số. Chúng không nằm trong `supabase/migrations/`, vì:
+[supabase/contract/](supabase/contract/) chứa `schema.sql` và `migration_001` → `migration_017`. Các file này đã chạy trên production bằng tay, theo thứ tự số. Chúng không nằm trong `supabase/migrations/`, vì:
 
 - chúng phụ thuộc bảng của app khác (`shared.dm_vat_tu`, `shared.dm_bo_vat_tu`, `app_contract.hoa_don_bovattu`), nên không chạy được trên Supabase local;
 - `supabase db push` sẽ coi chúng là migration chưa chạy và chạy lại trên production.
 
-Thay đổi mới cho phần hợp đồng: thêm file `migration_017_...sql` vào đó rồi chạy bằng `supabase db query --linked -f <file>`.
+Thay đổi mới cho phần hợp đồng: thêm file `migration_018_...sql` vào đó rồi chạy bằng `supabase db query --linked -f <file>`.
 
 ## Seed dữ liệu hợp đồng
 
