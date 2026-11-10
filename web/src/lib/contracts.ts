@@ -28,6 +28,8 @@ export type ContractItem = {
   so_luong_hd: number | null;
   so_luong_da_ban: number | null;
   so_luong_con_lai: number | null;
+  /** Contract end date; only on the dashboard quantity alerts. */
+  thoi_han?: string | null;
   is_bv_tu?: boolean;
   fy_sold?: Record<string, number>;
 };

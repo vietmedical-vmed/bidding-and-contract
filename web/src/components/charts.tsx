@@ -75,15 +75,20 @@ export function Panel({
   title,
   subtitle,
   right,
+  accent,
   children,
 }: {
   title: string;
   subtitle?: string;
   right?: React.ReactNode;
+  /** Coloured top edge for a panel that asks for action. */
+  accent?: "red";
   children: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <section
+      className={`overflow-hidden rounded-lg border border-slate-200 bg-white ${accent === "red" ? "border-t-2 border-t-red-500" : ""}`}
+    >
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-2.5">
         <div>
           <h3 className="text-[13px] font-semibold text-slate-800">{title}</h3>

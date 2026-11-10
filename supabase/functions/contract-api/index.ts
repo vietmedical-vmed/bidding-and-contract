@@ -125,6 +125,38 @@ async function getBuList(): Promise<string[]> {
   return [...NGOAI_KHOA_BUS].sort();
 }
 
+/**
+ * Public-hospital contract items still in force whose sold share is above `pct` %, highest first.
+ * Pages through the whole view: capping the rows before the threshold filter would drop alerts.
+ */
+async function getQuantityAlerts(
+  admin: SupabaseClient,
+  opts: { today: string; pct: number; filterMien?: string[] | null; mien?: string | null; maHds?: string[] | null },
+): Promise<any[]> {
+  const PAGE = 1000; // PostgREST max_rows
+  const out: any[] = [];
+  for (let from = 0; ; from += PAGE) {
+    let q = admin
+      .from("contract_items_remaining_view")
+      .select("*")
+      .eq("is_ngoai_khoa", true)
+      .eq("loai_bv", "Công")
+      .gt("so_luong_hd", 0)
+      .gte("thoi_han", opts.today);
+    if (opts.filterMien) q = q.in("mien", opts.filterMien);
+    if (opts.mien) q = q.eq("mien", opts.mien);
+    if (opts.maHds) q = q.in("ma_hd", opts.maHds);
+    const { data, error } = await q.order("id", { ascending: true }).range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    for (const it of (data || []) as any[]) {
+      const pct = Math.round(((it.so_luong_hd - (it.so_luong_con_lai ?? 0)) / it.so_luong_hd) * 100);
+      if (pct > opts.pct) out.push({ ...it, pct_used: pct });
+    }
+    if (!data || data.length < PAGE) break;
+  }
+  return out.sort((a, b) => b.pct_used - a.pct_used);
+}
+
 let _nhomSpCache: { data: string[]; ts: number } | null = null;
 const NHOM_SP_CACHE_TTL = 300000;
 
@@ -488,33 +520,15 @@ async function handleAction(
         .order("days_remaining", { ascending: true });
       if (perm.filterMien) eq = eq.in("mien", perm.filterMien);
 
-      let qq = admin
-        .from("contract_items_remaining_view")
-        .select("*")
-        .eq("is_ngoai_khoa", true)
-        .eq("loai_bv", "Công")
-        .gt("so_luong_hd", 0)
-        .gte("thoi_han", todayStr);
-      if (perm.filterMien) qq = qq.in("mien", perm.filterMien);
-      qq = qq.limit(500);
-
-      const [{ data: expiryRaw }, { data: itemsRaw }] = await Promise.all([eq, qq]);
+      const [{ data: expiryRaw }, quantity] = await Promise.all([
+        eq,
+        getQuantityAlerts(admin, { today: todayStr, pct: qtyPct, filterMien: perm.filterMien }),
+      ]);
 
       const expiry = (expiryRaw || []).map(c => ({
         ...c,
         level: c.days_remaining <= Math.min(...warnDays) ? "critical" : "warning",
       }));
-
-      const quantity: any[] = [];
-      for (const it of itemsRaw || []) {
-        const slHd = it.so_luong_hd ?? 1;
-        const conLai = it.so_luong_con_lai ?? 0;
-        const daBan = slHd - conLai;
-        const pct = slHd > 0 ? Math.round((daBan / slHd) * 100) : 0;
-        if (pct <= qtyPct) continue;
-        quantity.push({ ...it, pct_used: pct });
-      }
-      quantity.sort((a: any, b: any) => b.pct_used - a.pct_used);
 
       return { ok: true, expiry, quantity, quantity_warn_pct: qtyPct };
     }
@@ -579,22 +593,19 @@ async function handleAction(
       if (perm.filterMien) eq = eq.in("mien", perm.filterMien);
       if (mien) eq = eq.eq("mien", mien);
 
-      let qq = admin
-        .from("contract_items_remaining_view")
-        .select("*")
-        .eq("is_ngoai_khoa", true)
-        .eq("loai_bv", "Công")
-        .gt("so_luong_hd", 0)
-        .gte("thoi_han", today);
-      if (perm.filterMien) qq = qq.in("mien", perm.filterMien);
-      if (mien) qq = qq.eq("mien", mien);
-      if (filterMaHdSet) qq = qq.in("ma_hd", [...filterMaHdSet]);
-      qq = qq.limit(500);
-
-      const [allContractsRes, rawExpiryRes, itemsRawRes] = await Promise.all([allQ, eq, qq]);
+      const [allContractsRes, rawExpiryRes, quantityAlerts] = await Promise.all([
+        allQ,
+        eq,
+        getQuantityAlerts(admin, {
+          today,
+          pct: qtyPct,
+          filterMien: perm.filterMien,
+          mien,
+          maHds: filterMaHdSet ? [...filterMaHdSet] : null,
+        }),
+      ]);
       const allContracts = allContractsRes.data;
       const rawExpiry = rawExpiryRes.data;
-      const itemsRaw = itemsRawRes.data;
 
       // KPI counts
       let conHan = 0, sapHet = 0, hetHan = 0, kyMoi = 0;
@@ -612,17 +623,6 @@ async function handleAction(
       const expiryAlerts = filterMaHdSet
         ? (rawExpiry || []).filter((c: any) => filterMaHdSet!.has(c.ma_hd)).slice(0, 10)
         : (rawExpiry || []).slice(0, 10);
-
-      const quantityAlerts: any[] = [];
-      for (const it of itemsRaw || []) {
-        const slHd = it.so_luong_hd ?? 1;
-        const conLai = it.so_luong_con_lai ?? 0;
-        const daBan = slHd - conLai;
-        const pct = slHd > 0 ? Math.round((daBan / slHd) * 100) : 0;
-        if (pct <= qtyPct) continue;
-        quantityAlerts.push({ ...it, pct_used: pct });
-      }
-      quantityAlerts.sort((a: any, b: any) => b.pct_used - a.pct_used);
 
       const lastInvoiceDate = lastInvRes.data?.[0]?.ngay_tai_lieu || null;
 
