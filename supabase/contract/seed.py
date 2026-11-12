@@ -80,15 +80,15 @@ def main():
         f.write('BEGIN;\n\n')
 
         f.write('-- Clear existing data\n')
-        f.write('DELETE FROM contract_items;\n')
-        f.write('DELETE FROM contract_contracts;\n\n')
+        f.write('DELETE FROM app_contract.contract_items;\n')
+        f.write('DELETE FROM app_contract.contract_contracts;\n\n')
 
         # Insert contracts in batches
         f.write(f'-- Contracts ({len(contracts)} rows)\n')
         contract_list = list(contracts.values())
         for batch_start in range(0, len(contract_list), BATCH_SIZE):
             batch = contract_list[batch_start:batch_start + BATCH_SIZE]
-            f.write('INSERT INTO contract_contracts '
+            f.write('INSERT INTO app_contract.contract_contracts '
                     '(ma_hd, so_hd, nam, ngay_ky, thoi_han, khay, mien, '
                     'ma_kh, ten_kh, ten_ps, ten_so, so_bao_gia, so_goi_thau) VALUES\n')
             rows = []
@@ -116,7 +116,7 @@ def main():
         f.write(f'-- Items ({len(items)} rows)\n')
         for batch_start in range(0, len(items), BATCH_SIZE):
             batch = items[batch_start:batch_start + BATCH_SIZE]
-            f.write('INSERT INTO contract_items '
+            f.write('INSERT INTO app_contract.contract_items '
                     '(ma_hd, ma_chung, ma_ncc, ten_hang_hoa, so_luong, don_gia, tong_tien) VALUES\n')
             rows = []
             for item in batch:

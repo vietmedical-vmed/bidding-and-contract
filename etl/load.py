@@ -6,6 +6,11 @@ import requests
 
 from .config import Settings
 
+# Tables live in schema app_contract; the RPC replace_stg_bid_rows stays in public.
+SCHEMA = "app_contract"
+READ_PROFILE = {"Accept-Profile": SCHEMA}
+WRITE_PROFILE = {"Content-Profile": SCHEMA}
+
 
 class Supabase:
     def __init__(self, s: Settings):
@@ -24,14 +29,14 @@ class Supabase:
         return resp
 
     def sheet_hashes(self) -> dict[str, str]:
-        resp = self._req("GET", "bid_sheets", params={"select": "sheet_name,content_hash"})
+        resp = self._req("GET", "bid_sheets", headers=READ_PROFILE, params={"select": "sheet_name,content_hash"})
         return {row["sheet_name"]: row["content_hash"] for row in resp.json()}
 
     def start_run(self, source_name: str, etag: str | None, modified_at: str | None) -> int:
         resp = self._req(
             "POST",
             "bid_sync_runs",
-            headers={"Prefer": "return=representation"},
+            headers={"Prefer": "return=representation", **WRITE_PROFILE},
             json={"source_name": source_name, "source_etag": etag, "source_modified_at": modified_at},
         )
         return resp.json()[0]["id"]
@@ -49,6 +54,7 @@ class Supabase:
         self._req(
             "PATCH",
             "bid_sync_runs",
+            headers=WRITE_PROFILE,
             params={"id": f"eq.{run_id}"},
             json={
                 "status": status,

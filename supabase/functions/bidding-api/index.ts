@@ -143,7 +143,7 @@ async function withDefaultYear(admin: SupabaseClient, f: Filters, p: any, scope:
 // as yyyy-mm-dd in Vietnam time.
 async function dataUpdatedAt(admin: SupabaseClient): Promise<string | null> {
   const { data, error } = await admin
-    .from("bid_sync_runs")
+    .schema("app_contract").from("bid_sync_runs")
     .select("source_modified_at, finished_at")
     .eq("status", "success")
     .order("id", { ascending: false })
@@ -268,7 +268,7 @@ async function handleAction(action: string, p: any, session: Session, scope: Sco
       const q = sanitizeSearch(p?.q);
       const months = monthRange(p?.tu, p?.den);
 
-      let query = admin.from("bid_items").select(ITEM_COLUMNS, { count: "exact" });
+      let query = admin.schema("app_contract").from("bid_items").select(ITEM_COLUMNS, { count: "exact" });
       if (f.nam) query = query.eq("nam", f.nam);
       if (f.bu) query = query.eq("bu", f.bu);
       if (f.sale) query = query.eq("sale", f.sale);
@@ -310,7 +310,7 @@ async function handleAction(action: string, p: any, session: Session, scope: Sco
       const data: Row[] = [];
       for (let from = 0; ; from += 1000) {
         let query = admin
-          .from("bid_items")
+          .schema("app_contract").from("bid_items")
           .select("nam,so_tbmt,ben_moi_thau,ten_goi_thau,sheet_name,source_row,phan_loai,nhom_san_pham,mien,sale");
         if (f.nam) query = query.eq("nam", f.nam);
         if (f.bu) query = query.eq("bu", f.bu);

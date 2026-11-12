@@ -137,7 +137,7 @@ async function getQuantityAlerts(
   const out: any[] = [];
   for (let from = 0; ; from += PAGE) {
     let q = admin
-      .from("contract_items_remaining_view")
+      .schema("app_contract").from("contract_items_remaining_view")
       .select("*")
       .eq("is_ngoai_khoa", true)
       .eq("loai_bv", "Công")
@@ -269,7 +269,7 @@ async function handleAction(
       const today = now.toISOString().slice(0, 10);
 
       let q = admin
-        .from("contract_expiry_view")
+        .schema("app_contract").from("contract_expiry_view")
         .select("*", { count: "exact" })
         .eq("is_ngoai_khoa", true);
 
@@ -311,7 +311,7 @@ async function handleAction(
       if (!ma_hd) return { ok: false, error: "missing ma_hd" };
 
       const { data: contract, error: cErr } = await admin
-        .from("contract_contracts")
+        .schema("app_contract").from("contract_contracts")
         .select("*")
         .eq("ma_hd", ma_hd)
         .maybeSingle();
@@ -322,7 +322,7 @@ async function handleAction(
       }
 
       const [{ data: items, error: iErr }, { data: fySoldRaw }] = await Promise.all([
-        admin.from("contract_items_remaining_view").select("*").eq("ma_hd", ma_hd).order("id", { ascending: true }),
+        admin.schema("app_contract").from("contract_items_remaining_view").select("*").eq("ma_hd", ma_hd).order("id", { ascending: true }),
         contract.so_hd ? admin.rpc("fn_sold_by_fy", { p_so_hd: contract.so_hd }) : Promise.resolve({ data: [] }),
       ]);
       if (iErr) return { ok: false, error: iErr.message };
@@ -380,7 +380,7 @@ async function handleAction(
       }
 
       let q = admin
-        .from("contract_expiry_view")
+        .schema("app_contract").from("contract_expiry_view")
         .select("*")
         .eq("is_ngoai_khoa", true)
         .limit(5000);
@@ -404,7 +404,7 @@ async function handleAction(
       const allItems: any[] = [];
       for (let i = 0; i < maHdList.length; i += 50) {
         const { data } = await admin
-          .from("contract_items_remaining_view")
+          .schema("app_contract").from("contract_items_remaining_view")
           .select("*")
           .in("ma_hd", maHdList.slice(i, i + 50));
         if (data) allItems.push(...data);
@@ -501,7 +501,7 @@ async function handleAction(
 
     // ── get-alerts ───────────────────────────────────────────────────────
     case "get-alerts": {
-      const { data: cfgRows } = await admin.from("contract_alert_config").select("key, value");
+      const { data: cfgRows } = await admin.schema("app_contract").from("contract_alert_config").select("key, value");
       const cfg: Record<string, any> = {};
       for (const r of cfgRows || []) cfg[r.key] = r.value;
 
@@ -512,7 +512,7 @@ async function handleAction(
 
       // Run expiry + quantity queries in parallel
       let eq = admin
-        .from("contract_expiry_view")
+        .schema("app_contract").from("contract_expiry_view")
         .select("*")
         .eq("is_ngoai_khoa", true)
         .gte("days_remaining", 0)
@@ -547,7 +547,7 @@ async function handleAction(
 
       // Phase 1: run independent queries in parallel
       const [cfgResult, buMaHds, nhomMaHds, buListRes, nhomSpList, lastInvRes] = await Promise.all([
-        admin.from("contract_alert_config").select("key, value"),
+        admin.schema("app_contract").from("contract_alert_config").select("key, value"),
         bu ? resolveBu(admin, bu) : Promise.resolve(null),
         nhom_sp ? resolveNhomSp(admin, nhom_sp) : Promise.resolve(null),
         getBuList(),
@@ -574,7 +574,7 @@ async function handleAction(
       }
 
       // Phase 2: run data queries in parallel (all deps resolved)
-      let allQ = admin.from("contract_expiry_view")
+      let allQ = admin.schema("app_contract").from("contract_expiry_view")
         .select("ma_hd, ngay_ky, thoi_han")
         .eq("is_ngoai_khoa", true)
         .or(`and(thoi_han.gte.${fyStart},ngay_ky.lt.${fyStart}),ngay_ky.gte.${fyStart}`)
@@ -583,7 +583,7 @@ async function handleAction(
       if (mien) allQ = allQ.eq("mien", mien);
 
       let eq = admin
-        .from("contract_expiry_view")
+        .schema("app_contract").from("contract_expiry_view")
         .select("*")
         .eq("is_ngoai_khoa", true)
         .gte("days_remaining", 0)
@@ -646,7 +646,7 @@ async function handleAction(
 
     // ── get-config ───────────────────────────────────────────────────────
     case "get-config": {
-      const { data } = await admin.from("contract_alert_config").select("key, value");
+      const { data } = await admin.schema("app_contract").from("contract_alert_config").select("key, value");
       const config: Record<string, any> = {};
       for (const r of data || []) config[r.key] = r.value;
       return { ok: true, config };
@@ -660,7 +660,7 @@ async function handleAction(
 
       for (const [key, value] of Object.entries(config)) {
         const { error } = await admin
-          .from("contract_alert_config")
+          .schema("app_contract").from("contract_alert_config")
           .upsert({ key, value: JSON.parse(JSON.stringify(value)), updated_at: new Date().toISOString(), updated_by: session.username });
         if (error) return { ok: false, error: error.message };
       }
