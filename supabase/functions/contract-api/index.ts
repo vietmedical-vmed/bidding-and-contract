@@ -173,6 +173,48 @@ async function getNhomSpList(admin: SupabaseClient, bu?: string): Promise<string
   return result;
 }
 
+/** nhom_san_pham of each ma_chung, from dm_vat_tu first then dm_bo_vat_tu; unknown codes are left out. */
+async function getNhomByMaChung(admin: SupabaseClient, maChungs: (string | null)[]): Promise<Record<string, string>> {
+  const list = [...new Set(maChungs.filter(Boolean))] as string[];
+  const out: Record<string, string> = {};
+  for (let i = 0; i < list.length; i += 50) {
+    const batch = list.slice(i, i + 50);
+    const [vtRes, boRes] = await Promise.all([
+      admin.schema("shared").from("dm_vat_tu").select("ma_chung, nhom_san_pham").in("ma_chung", batch),
+      admin.schema("shared").from("dm_bo_vat_tu").select("ma_chung, nhom_san_pham").in("ma_chung", batch),
+    ]);
+    for (const r of [...(vtRes.data || []), ...(boRes.data || [])] as any[]) {
+      if (r.nhom_san_pham && !out[r.ma_chung]) out[r.ma_chung] = r.nhom_san_pham;
+    }
+  }
+  return out;
+}
+
+/** Adds nhom_sp_list (the product groups of a contract's items, sorted) to each contract of a page. */
+async function withNhomSp(admin: SupabaseClient, contracts: any[]): Promise<any[]> {
+  if (!contracts.length) return contracts;
+  const PAGE = 1000; // PostgREST max_rows
+  const items: any[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await admin
+      .schema("app_contract").from("contract_items")
+      .select("ma_hd, ma_chung")
+      .in("ma_hd", contracts.map((c) => c.ma_hd))
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    items.push(...(data || []));
+    if (!data || data.length < PAGE) break;
+  }
+  const nhomMap = await getNhomByMaChung(admin, items.map((it) => it.ma_chung));
+  const byHd: Record<string, Set<string>> = {};
+  for (const it of items) {
+    const nhom = it.ma_chung && nhomMap[it.ma_chung];
+    if (nhom) (byHd[it.ma_hd] ??= new Set()).add(nhom);
+  }
+  return contracts.map((c) => ({ ...c, nhom_sp_list: [...(byHd[c.ma_hd] ?? [])].sort() }));
+}
+
 // ─── Action dispatch ─────────────────────────────────────────────────────
 async function handleAction(
   action: string,
@@ -302,7 +344,7 @@ async function handleAction(
       const { data, count, error } = await q;
       if (error) return { ok: false, error: error.message };
 
-      return { ok: true, data, total: count, bu_list: buList, nhom_sp_list: nhomSpList };
+      return { ok: true, data: await withNhomSp(admin, data || []), total: count, bu_list: buList, nhom_sp_list: nhomSpList };
     }
 
     // ── contract-detail ──────────────────────────────────────────────────
@@ -326,6 +368,7 @@ async function handleAction(
         contract.so_hd ? admin.rpc("fn_sold_by_fy", { p_so_hd: contract.so_hd }) : Promise.resolve({ data: [] }),
       ]);
       if (iErr) return { ok: false, error: iErr.message };
+      const nhomMap = await getNhomByMaChung(admin, (items || []).map((it: any) => it.ma_chung));
 
       const fySold: Record<string, Record<number, number>> = {};
       for (const r of fySoldRaw || []) {
@@ -341,6 +384,7 @@ async function handleAction(
 
       const itemsWithFy = (items || []).map((it: any) => ({
         ...it,
+        nhom_sp: (it.ma_chung && nhomMap[it.ma_chung]) || null,
         fy_sold: fyList.reduce((acc: Record<string, number>, fy: number) => {
           acc["fy" + (fy % 100)] = fySold[it.ma_chung]?.[fy] || 0;
           return acc;
@@ -410,26 +454,8 @@ async function handleAction(
         if (data) allItems.push(...data);
       }
 
-      // Build nhom_san_pham lookup by ma_chung from dm_vat_tu + dm_bo_vat_tu
-      const maChungList = [...new Set(allItems.map((it: any) => it.ma_chung).filter(Boolean))];
-      const chungMap: Record<string, string> = {};
-      for (let i = 0; i < maChungList.length; i += 50) {
-        const batch = maChungList.slice(i, i + 50);
-        const [vtRes, boRes] = await Promise.all([
-          admin.schema("shared").from("dm_vat_tu").select("ma_chung, nhom_san_pham").in("ma_chung", batch),
-          admin.schema("shared").from("dm_bo_vat_tu").select("ma_chung, nhom_san_pham").in("ma_chung", batch),
-        ]);
-        for (const r of (vtRes.data || []) as any[]) {
-          if (r.nhom_san_pham && !chungMap[r.ma_chung]) chungMap[r.ma_chung] = r.nhom_san_pham;
-        }
-        for (const r of (boRes.data || []) as any[]) {
-          if (r.nhom_san_pham && !chungMap[r.ma_chung]) chungMap[r.ma_chung] = r.nhom_san_pham;
-        }
-      }
-      const lookupNhom = (item: any): string => {
-        if (item.ma_chung && chungMap[item.ma_chung]) return chungMap[item.ma_chung];
-        return "";
-      };
+      const chungMap = await getNhomByMaChung(admin, allItems.map((it: any) => it.ma_chung));
+      const lookupNhom = (item: any): string => (item.ma_chung && chungMap[item.ma_chung]) || "";
 
       // Sold quantity per fiscal year, keyed so_hd → ma_chung → fy (same numbers as contract-detail).
       const soHdList = [...new Set(contracts.map((c: any) => c.so_hd).filter(Boolean))] as string[];

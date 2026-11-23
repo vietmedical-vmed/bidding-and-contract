@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Fragment, Suspense, useState } from "react";
 import { AppShell, LoadingBlock, RefreshingBar } from "@/components/AppShell";
 import { ContractFilters } from "@/components/ContractFilters";
-import { Badge, DaysBadge, StatusTabs, UsageBar } from "@/components/contractUi";
+import { Badge, DaysBadge, NhomBadge, StatusTabs, UsageBar } from "@/components/contractUi";
 import { ChevronLeft, ChevronRight, Download } from "@/components/icons";
 import { PageLink } from "@/components/PageLink";
 import { SearchBox } from "@/components/SearchBox";
@@ -26,7 +26,7 @@ import {
 import { useApi } from "@/lib/useApi";
 
 const PAGE_SIZE = 15;
-const COLUMNS = 8;
+const COLUMNS = 9;
 
 export default function ContractListPage() {
   return (
@@ -89,6 +89,7 @@ function ContractListView() {
                   <th className="px-3 py-2 text-left font-semibold">Hợp đồng</th>
                   <th className="px-3 py-2 text-left font-semibold">Khách hàng</th>
                   <th className="px-3 py-2 text-left font-semibold">Miền</th>
+                  <th className="px-3 py-2 text-left font-semibold">Nhóm sản phẩm</th>
                   <th className="px-3 py-2 text-left font-semibold">Ngày ký</th>
                   <th className="px-3 py-2 text-left font-semibold">Thời hạn</th>
                   <th className="px-3 py-2 text-left font-semibold">Còn lại</th>
@@ -163,6 +164,17 @@ function ContractRows({ rows }: { rows: Contract[] }) {
                 </div>
               </td>
               <td className="whitespace-nowrap px-3 py-2 text-slate-600">{c.mien || "—"}</td>
+              <td className="max-w-64 px-3 py-2">
+                {c.nhom_sp_list?.length ? (
+                  <div className="flex flex-wrap gap-1">
+                    {c.nhom_sp_list.map((n) => (
+                      <NhomBadge key={n} name={n} />
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-slate-400">—</span>
+                )}
+              </td>
               <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600">{fmtDate(c.ngay_ky)}</td>
               <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600">{fmtDate(c.thoi_han)}</td>
               <td className="whitespace-nowrap px-3 py-2">
@@ -208,6 +220,7 @@ function ContractItems({ maHd }: { maHd: string }) {
                 <tr className="border-b border-slate-100 text-[10px] uppercase tracking-wide text-slate-500">
                   <th className="px-2 py-1.5 text-right font-semibold">#</th>
                   <th className="px-2 py-1.5 text-left font-semibold">Sản phẩm</th>
+                  <th className="px-2 py-1.5 text-left font-semibold">Nhóm sản phẩm</th>
                   <th className="px-2 py-1.5 text-right font-semibold">Đơn giá</th>
                   <th className="px-2 py-1.5 text-right font-semibold">SL thầu</th>
                   {fyList.map((fy) => (
@@ -231,6 +244,9 @@ function ContractItems({ maHd }: { maHd: string }) {
                       <div className="text-[11px] text-slate-400">
                         {it.ma_chung || "—"} · {it.ma_ncc || "—"}
                       </div>
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <NhomBadge name={it.nhom_sp} />
                     </td>
                     <td className={`${num} whitespace-nowrap text-slate-600`}>{fmtMoney(it.don_gia)}</td>
                     <td className={`${num} text-slate-700`}>{fmtInt(it.so_luong_hd ?? 0)}</td>

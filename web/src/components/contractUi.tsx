@@ -136,3 +136,33 @@ export function UsageBar({ item }: { item: { so_luong_hd: number | null; so_luon
     </div>
   );
 }
+
+/** Badge colours for product groups; full class strings so Tailwind keeps them. */
+const NHOM_TONES = [
+  "bg-sky-50 text-sky-700 border-sky-200",
+  "bg-emerald-50 text-emerald-700 border-emerald-200",
+  "bg-violet-50 text-violet-700 border-violet-200",
+  "bg-amber-50 text-amber-800 border-amber-200",
+  "bg-rose-50 text-rose-700 border-rose-200",
+  "bg-teal-50 text-teal-700 border-teal-200",
+  "bg-indigo-50 text-indigo-700 border-indigo-200",
+  "bg-orange-50 text-orange-700 border-orange-200",
+  "bg-lime-50 text-lime-800 border-lime-200",
+  "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200",
+  "bg-cyan-50 text-cyan-700 border-cyan-200",
+  "bg-pink-50 text-pink-700 border-pink-200",
+];
+
+/** Same group, same colour on every page: the tone comes from a hash of the name. */
+function nhomTone(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return NHOM_TONES[h % NHOM_TONES.length];
+}
+
+export function NhomBadge({ name }: { name: string | null | undefined }) {
+  if (!name) return <span className="text-slate-400">—</span>;
+  return (
+    <span className={`inline-block whitespace-nowrap rounded border px-1.5 py-0.5 text-[11px] font-medium ${nhomTone(name)}`}>{name}</span>
+  );
+}

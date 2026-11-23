@@ -13,6 +13,8 @@ export type Contract = {
   days_remaining: number | null;
   ten_ps: string | null;
   ten_so: string | null;
+  /** Product groups of the contract's items; only on list-contracts. */
+  nhom_sp_list?: string[];
 };
 
 /** A row of contract_items_remaining_view (plus fy_sold from contract-detail). */
@@ -25,6 +27,8 @@ export type ContractItem = {
   ma_ncc: string | null;
   ten_hang_hoa: string | null;
   don_gia: number | null;
+  /** Product group of ma_chung; only on contract-detail. */
+  nhom_sp?: string | null;
   so_luong_hd: number | null;
   so_luong_da_ban: number | null;
   so_luong_con_lai: number | null;
