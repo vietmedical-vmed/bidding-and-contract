@@ -15,6 +15,8 @@ export type Contract = {
   ten_so: string | null;
   /** Product groups of the contract's items; only on list-contracts. */
   nhom_sp_list?: string[];
+  /** Some item rows carry the placeholder code IMPLANT; only on list-contracts. */
+  has_implant?: boolean;
 };
 
 /** A row of contract_items_remaining_view (plus fy_sold from contract-detail). */
@@ -88,6 +90,17 @@ export function usedPct(it: Pick<ContractItem, "so_luong_hd" | "so_luong_con_lai
   const total = it.so_luong_hd ?? 0;
   if (total <= 0) return null;
   return Math.min(100, Math.max(0, Math.round(((total - (it.so_luong_con_lai ?? 0)) / total) * 100)));
+}
+
+/**
+ * Older contracts list a whole implant set under the placeholder mã chung IMPLANT. Sales are matched
+ * to items by mã chung and invoices carry the real codes, so these rows match no sale: "Đã bán"
+ * stays 0 and the quantity left is meaningless. contract-api's has_implant uses the same test.
+ */
+export const IMPLANT_HINT = "Hợp đồng cũ ghi mã IMPLANT: không xác định được sản phẩm và số lượng bán";
+
+export function isImplant(it: Pick<ContractItem, "ma_chung">): boolean {
+  return it.ma_chung?.trim().toUpperCase() === "IMPLANT";
 }
 
 /** yyyy-mm-dd[...] -> dd/mm/yyyy without going through Date (no timezone shift). */

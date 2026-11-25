@@ -5,7 +5,7 @@ import { Fragment, Suspense, useState } from "react";
 import { AppShell, LoadingBlock, RefreshingBar } from "@/components/AppShell";
 import { ContractFilters } from "@/components/ContractFilters";
 import { Badge, DaysBadge, NhomBadge, StatusTabs, UsageBar } from "@/components/contractUi";
-import { ChevronLeft, ChevronRight, Download } from "@/components/icons";
+import { AlertTriangle, ChevronLeft, ChevronRight, Download } from "@/components/icons";
 import { PageLink } from "@/components/PageLink";
 import { SearchBox } from "@/components/SearchBox";
 import { api, errorMessage } from "@/lib/api";
@@ -14,6 +14,8 @@ import { downloadContractsXlsx, type ExportFy, type ExportRow } from "@/lib/cont
 import {
   fmtDate,
   fmtMoney,
+  IMPLANT_HINT,
+  isImplant,
   parseContractFilters,
   STATUSES,
   usedPct,
@@ -165,11 +167,12 @@ function ContractRows({ rows }: { rows: Contract[] }) {
               </td>
               <td className="whitespace-nowrap px-3 py-2 text-slate-600">{c.mien || "—"}</td>
               <td className="max-w-64 px-3 py-2">
-                {c.nhom_sp_list?.length ? (
+                {c.nhom_sp_list?.length || c.has_implant ? (
                   <div className="flex flex-wrap gap-1">
-                    {c.nhom_sp_list.map((n) => (
+                    {c.nhom_sp_list?.map((n) => (
                       <NhomBadge key={n} name={n} />
                     ))}
+                    {c.has_implant && <ImplantBadge />}
                   </div>
                 ) : (
                   <span className="text-slate-400">—</span>
@@ -193,17 +196,37 @@ function ContractRows({ rows }: { rows: Contract[] }) {
   );
 }
 
+/** Marks a contract or item that uses the placeholder code IMPLANT (no sales can be matched). */
+function ImplantBadge() {
+  return (
+    <span
+      title={IMPLANT_HINT}
+      className="inline-flex items-center gap-1 whitespace-nowrap rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-800"
+    >
+      <AlertTriangle size={11} />
+      Mã IMPLANT
+    </span>
+  );
+}
+
 /** Items of one contract with the quantity sold in each fiscal year it spans. */
 function ContractItems({ maHd }: { maHd: string }) {
   const detail = useApi<ContractDetail>("contract-detail", { ma_hd: maHd }, "contract");
   const d = detail.data;
   const fyList = d?.fy_list ?? [];
-  // Most used first, then by supplier code.
+  // Most used first, then by supplier code; IMPLANT rows (no usage known) last.
   const items = [...(d?.items ?? [])].sort(
-    (a, b) => (usedPct(b) ?? 0) - (usedPct(a) ?? 0) || (a.ma_ncc ?? "").localeCompare(b.ma_ncc ?? ""),
+    (a, b) =>
+      Number(isImplant(a)) - Number(isImplant(b)) ||
+      (usedPct(b) ?? 0) - (usedPct(a) ?? 0) ||
+      (a.ma_ncc ?? "").localeCompare(b.ma_ncc ?? ""),
   );
 
+  const implantRows = items.filter(isImplant).length;
+
   const num = "px-2 py-1.5 text-right tabular-nums";
+  /** IMPLANT rows match no sale, so their sold and left figures would only mislead. */
+  const unknown = <span className="text-slate-400" title={IMPLANT_HINT}>—</span>;
   return (
     <tr>
       <td colSpan={COLUMNS} className="border-b border-slate-200 bg-slate-50 px-3 py-2.5 pl-9">
@@ -215,6 +238,15 @@ function ContractItems({ maHd }: { maHd: string }) {
           <div className="py-4 text-center text-[12px] text-slate-400">Không có sản phẩm</div>
         ) : (
           <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
+            {implantRows > 0 && (
+              <div className="flex items-start gap-1.5 border-b border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+                <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-600" />
+                <span>
+                  {fmtInt(implantRows)} dòng ghi mã <b>IMPLANT</b> thay vì mã sản phẩm, nên không xác định được sản phẩm và
+                  số lượng đã bán. Vui lòng đối chiếu với hợp đồng gốc và hóa đơn trước khi xuất hàng.
+                </span>
+              </div>
+            )}
             <table className="w-full border-collapse text-[12px]">
               <thead>
                 <tr className="border-b border-slate-100 text-[10px] uppercase tracking-wide text-slate-500">
@@ -234,8 +266,13 @@ function ContractItems({ maHd }: { maHd: string }) {
                 </tr>
               </thead>
               <tbody>
-                {items.map((it, i) => (
-                  <tr key={it.id ?? i} className={`align-top ${i % 2 ? "bg-slate-50/50" : "bg-white"}`}>
+                {items.map((it, i) => {
+                  const implant = isImplant(it);
+                  return (
+                  <tr
+                    key={it.id ?? i}
+                    className={`align-top ${implant ? "bg-amber-50/60" : i % 2 ? "bg-slate-50/50" : "bg-white"}`}
+                  >
                     <td className="px-2 py-1.5 text-right tabular-nums text-slate-400">{i + 1}</td>
                     <td className="max-w-80 px-2 py-1.5">
                       <div className="line-clamp-1 text-slate-800" title={it.ten_hang_hoa ?? ""}>
@@ -245,24 +282,35 @@ function ContractItems({ maHd }: { maHd: string }) {
                         {it.ma_chung || "—"} · {it.ma_ncc || "—"}
                       </div>
                     </td>
-                    <td className="px-2 py-1.5">
-                      <NhomBadge name={it.nhom_sp} />
-                    </td>
+                    <td className="px-2 py-1.5">{implant ? <ImplantBadge /> : <NhomBadge name={it.nhom_sp} />}</td>
                     <td className={`${num} whitespace-nowrap text-slate-600`}>{fmtMoney(it.don_gia)}</td>
                     <td className={`${num} text-slate-700`}>{fmtInt(it.so_luong_hd ?? 0)}</td>
                     {fyList.map((fy) => {
                       const v = it.fy_sold?.[`fy${fy.fy % 100}`] ?? 0;
                       return (
                         <td key={fy.fy} className={`${num} ${v > 0 ? "text-slate-700" : "text-slate-300"}`}>
-                          {fmtInt(v)}
+                          {implant ? unknown : fmtInt(v)}
                         </td>
                       );
                     })}
-                    <td className={`${num} text-slate-700`}>{fmtInt(it.so_luong_da_ban ?? 0)}</td>
-                    <td className={`${num} font-semibold text-slate-800`}>{it.is_bv_tu ? "—" : fmtInt(it.so_luong_con_lai ?? 0)}</td>
-                    <td className="px-2 py-1.5 pr-3">{it.is_bv_tu ? <span className="text-slate-400">—</span> : <UsageBar item={it} />}</td>
+                    <td className={`${num} text-slate-700`}>{implant ? unknown : fmtInt(it.so_luong_da_ban ?? 0)}</td>
+                    <td className={`${num} font-semibold text-slate-800`}>
+                      {implant ? unknown : it.is_bv_tu ? "—" : fmtInt(it.so_luong_con_lai ?? 0)}
+                    </td>
+                    <td className="px-2 py-1.5 pr-3">
+                      {implant ? (
+                        <span className="text-[11px] text-amber-800" title={IMPLANT_HINT}>
+                          Không xác định
+                        </span>
+                      ) : it.is_bv_tu ? (
+                        <span className="text-slate-400">—</span>
+                      ) : (
+                        <UsageBar item={it} />
+                      )}
+                    </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             <div className="border-t border-slate-100 px-3 py-1.5 text-[11px] text-slate-400">{items.length} sản phẩm</div>

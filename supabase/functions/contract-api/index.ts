@@ -190,7 +190,10 @@ async function getNhomByMaChung(admin: SupabaseClient, maChungs: (string | null)
   return out;
 }
 
-/** Adds nhom_sp_list (the product groups of a contract's items, sorted) to each contract of a page. */
+/**
+ * Adds nhom_sp_list (the product groups of a contract's items, sorted) to each contract of a page,
+ * and has_implant when an item uses the placeholder code IMPLANT (no product, so no sales match it).
+ */
 async function withNhomSp(admin: SupabaseClient, contracts: any[]): Promise<any[]> {
   if (!contracts.length) return contracts;
   const PAGE = 1000; // PostgREST max_rows
@@ -208,11 +211,17 @@ async function withNhomSp(admin: SupabaseClient, contracts: any[]): Promise<any[
   }
   const nhomMap = await getNhomByMaChung(admin, items.map((it) => it.ma_chung));
   const byHd: Record<string, Set<string>> = {};
+  const implantHd = new Set<string>();
   for (const it of items) {
     const nhom = it.ma_chung && nhomMap[it.ma_chung];
     if (nhom) (byHd[it.ma_hd] ??= new Set()).add(nhom);
+    if (String(it.ma_chung ?? "").trim().toUpperCase() === "IMPLANT") implantHd.add(it.ma_hd);
   }
-  return contracts.map((c) => ({ ...c, nhom_sp_list: [...(byHd[c.ma_hd] ?? [])].sort() }));
+  return contracts.map((c) => ({
+    ...c,
+    nhom_sp_list: [...(byHd[c.ma_hd] ?? [])].sort(),
+    has_implant: implantHd.has(c.ma_hd),
+  }));
 }
 
 // ─── Action dispatch ─────────────────────────────────────────────────────
