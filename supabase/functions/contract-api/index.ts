@@ -173,17 +173,27 @@ async function getNhomSpList(admin: SupabaseClient, bu?: string): Promise<string
   return result;
 }
 
-/** nhom_san_pham of each ma_chung, from dm_vat_tu first then dm_bo_vat_tu; unknown codes are left out. */
+/**
+ * nhom_san_pham of each item code, from dm_vat_tu first, then dm_bo_vat_tu by ma_chung, then
+ * dm_bo_vat_tu by ma_bo_vat_tu: some contracts list a kit under its kit code (UL.ADD2) instead of
+ * its ma_chung. Unknown codes are left out.
+ */
 async function getNhomByMaChung(admin: SupabaseClient, maChungs: (string | null)[]): Promise<Record<string, string>> {
   const list = [...new Set(maChungs.filter(Boolean))] as string[];
   const out: Record<string, string> = {};
   for (let i = 0; i < list.length; i += 50) {
     const batch = list.slice(i, i + 50);
-    const [vtRes, boRes] = await Promise.all([
+    const [vtRes, boRes, boMaRes] = await Promise.all([
       admin.schema("shared").from("dm_vat_tu").select("ma_chung, nhom_san_pham").in("ma_chung", batch),
       admin.schema("shared").from("dm_bo_vat_tu").select("ma_chung, nhom_san_pham").in("ma_chung", batch),
+      admin.schema("shared").from("dm_bo_vat_tu").select("ma_bo_vat_tu, nhom_san_pham").in("ma_bo_vat_tu", batch),
     ]);
-    for (const r of [...(vtRes.data || []), ...(boRes.data || [])] as any[]) {
+    const rows = [
+      ...(vtRes.data || []),
+      ...(boRes.data || []),
+      ...((boMaRes.data || []) as any[]).map((r) => ({ ma_chung: r.ma_bo_vat_tu, nhom_san_pham: r.nhom_san_pham })),
+    ] as any[];
+    for (const r of rows) {
       if (r.nhom_san_pham && !out[r.ma_chung]) out[r.ma_chung] = r.nhom_san_pham;
     }
   }

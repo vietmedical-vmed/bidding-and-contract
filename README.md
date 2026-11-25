@@ -116,12 +116,12 @@ Theo dõi hợp đồng trúng thầu ngoại khoa (BU `CH&CS`, `CTTM & CTUT`, `
 
 ## SQL
 
-[supabase/contract/](supabase/contract/) chứa `schema.sql` và `migration_001` → `migration_018`. Các file này đã chạy trên production bằng tay, theo thứ tự số. Chúng không nằm trong `supabase/migrations/`, vì:
+[supabase/contract/](supabase/contract/) chứa `schema.sql` và `migration_001` → `migration_019`. Các file này đã chạy trên production bằng tay, theo thứ tự số. Chúng không nằm trong `supabase/migrations/`, vì:
 
 - chúng phụ thuộc bảng của app khác (`shared.dm_vat_tu`, `shared.dm_bo_vat_tu`, `app_contract.hoa_don_bovattu`), nên không chạy được trên Supabase local;
 - `supabase db push` sẽ coi chúng là migration chưa chạy và chạy lại trên production.
 
-Thay đổi mới cho phần hợp đồng: thêm file `migration_019_...sql` vào đó rồi chạy bằng `supabase db query --linked -f <file>`.
+Thay đổi mới cho phần hợp đồng: thêm file `migration_020_...sql` vào đó rồi chạy bằng `supabase db query --linked -f <file>`.
 
 ## Seed dữ liệu hợp đồng
 
